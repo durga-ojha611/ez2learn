@@ -1,0 +1,109 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-heading: 'Bricolage Grotesque', sans-serif;
+  --font-sans: 'Bricolage Grotesque', sans-serif;
+  --font-bricolage: 'Bricolage Grotesque', sans-serif;
+  --primary-navy: #07345B;
+  --brand-yellow: #FAB10B;
+  --pure-white: #FFFFFF;
+  --border-subtle: #E9EDF2;
+  --primary-text: #172B3A;
+  --secondary-text: #748190;
+}
+
+*, *::before, *::after {
+  font-family: 'Bricolage Grotesque', sans-serif;
+}
+
+body {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  background-color: #FFFFFF !important;
+  color: #172B3A;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: 'Bricolage Grotesque', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* 48px Large Bold Headings per user requirement */
+.heading-48, .page-title-48, h1.page-heading {
+  font-family: 'Bricolage Grotesque', sans-serif !important;
+  font-size: 48px !important;
+  line-height: 1.15 !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+}
+
+/* 1. Global hidden scrollbars - scrollable without visible scrollbars */
+html, body, div, main, aside, table, section, article, nav, ul, ol, form, [class*="overflow"] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Minimal clean card with subtle border matching reference */
+.card-clean {
+  background-color: #FFFFFF;
+  border: 1px solid #E9EDF2;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px 0 rgba(7, 52, 91, 0.02);
+}
+
+/* Interactive button styles adhering strictly to section 1 */
+.btn-white {
+  background-color: #FFFFFF;
+  color: #07345B;
+  border: 1px solid #E9EDF2;
+  font-family: var(--font-inter);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.15s ease-in-out;
+}
+.btn-white:hover {
+  background-color: #F0F5FA;
+  border-color: #D4DBE4;
+}
+.btn-white:active, .btn-white.active {
+  background-color: #07345B;
+  color: #FFFFFF;
+  border-color: #07345B;
+}
+
+.btn-primary {
+  background-color: #07345B;
+  color: #FFFFFF;
+  border: 1px solid #07345B;
+  font-family: var(--font-inter);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.15s ease-in-out;
+}
+.btn-primary:hover {
+  background-color: #0B4373;
+  border-color: #0B4373;
+}
+
+/* Minimal table header styling */
+.table-head {
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #E9EDF2;
+  color: #748190;
+  font-family: var(--font-inter);
+  font-size: 14px;
+  font-weight: 600;
+}
