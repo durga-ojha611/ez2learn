@@ -70,7 +70,7 @@ class ReviewController {
                    COALESCE(s.student_code, CONCAT('STU-', LPAD(s.id, 4, '0')), 'STU-1045') as student_code,
                    COALESCE(s.name, r.student_name) as student_name,
                    COALESCE(s.phone, '+91 98765 43210') as student_phone,
-                   COALESCE(s.email, r.student_email, 'student@ezy2learn.com') as student_email,
+                   COALESCE(s.email, 'student@ezy2learn.com') as student_email,
                    COALESCE(s.avatar_url, 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80') as student_avatar,
                    COALESCE(i.instructor_code, CONCAT('INS-', LPAD(i.id, 4, '0')), 'INS-2587') as instructor_code,
                    COALESCE(i.name, 'Rahul Sinha') as instructor_name,

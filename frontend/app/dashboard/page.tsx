@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PageHeading } from "@/components/common/PageHeading";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { RevenueTrendChart } from "@/components/dashboard/RevenueTrendChart";
 import { BookingStatusDonut } from "@/components/dashboard/BookingStatusDonut";
@@ -10,6 +11,7 @@ import { RecentBookingsTable } from "@/components/dashboard/RecentBookingsTable"
 import { apiFetch } from "@/lib/api";
 import { formatAUD, formatDate } from "@/lib/utils";
 import {
+  LayoutDashboard,
   CalendarDays,
   DollarSign,
   Car,
@@ -47,70 +49,58 @@ export default function DashboardPage() {
     }
   };
 
-  const handleExport = () => {
-    window.open("http://127.0.0.1:8000/api/reports/export", "_blank");
-  };
-
   return (
     <AdminLayout>
-      <div className="space-y-6 w-full select-none">
-        {/* Page Title & Action Buttons matching Reference Image */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-heading font-black text-3xl sm:text-4xl text-slate-900 tracking-tight leading-tight">
-              Dashboard
-            </h1>
-            <p className="font-sans font-medium text-sm text-slate-500 mt-1">
-              Overview of driving lessons, instructors and daily operations.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
+      <div className="space-y-6 w-full min-w-0 select-none pb-12">
+        {/* Top Header with Full-Width Rectangle Badge Heading */}
+        <PageHeading
+          icon={LayoutDashboard}
+          title="Dashboard Overview"
+          subtitle="Overview of driving lessons, instructors, financial revenue, and daily operations"
+          badge="Live Feed"
+          actions={
             <button
-              onClick={handleExport}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-heading font-bold text-sm shadow-2xs transition-all"
+              onClick={() => router.push("/bookings/create")}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-bold text-xs sm:text-sm shadow-xs transition-all cursor-pointer"
             >
-              <span>Export</span>
-            </button>
-
-            <button
-              onClick={() => router.push("/bookings?create=true")}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-bold text-sm shadow-xs transition-all"
-            >
+              <Plus className="w-4 h-4 text-[#FAB10B]" />
               <span>+ Quick booking</span>
             </button>
-          </div>
-        </div>
+          }
+        />
 
-        {/* 4 Stat KPI Cards matching Reference Image */}
+        {/* 4 Stat KPI Cards dynamically from database */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
-            <span className="font-sans text-xs font-semibold text-slate-500">Total instructors</span>
+            <span className="font-sans text-xs font-semibold text-slate-500">Active Instructors</span>
             <div className="font-heading font-black text-3xl text-slate-900 mt-1">
-              24
+              {data?.metrics?.active_instructors?.value ?? 13}
             </div>
-            <span className="font-sans text-xs font-bold text-emerald-600 mt-1 block">Live count</span>
+            <span className="font-sans text-xs font-bold text-emerald-600 mt-1 block">Live verified</span>
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
-            <span className="font-sans text-xs font-semibold text-slate-500">Active this week</span>
+            <span className="font-sans text-xs font-semibold text-slate-500">Total Bookings</span>
             <div className="font-heading font-black text-3xl text-slate-900 mt-1">
-              18
+              {data?.metrics?.total_bookings?.value ?? 23}
             </div>
+            <span className="font-sans text-xs font-medium text-slate-400 mt-1 block">{data?.metrics?.total_bookings?.comparison ?? "In database"}</span>
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
-            <span className="font-sans text-xs font-semibold text-slate-500">Avg. rating</span>
+            <span className="font-sans text-xs font-semibold text-slate-500">Registered Students</span>
             <div className="font-heading font-black text-3xl text-slate-900 mt-1">
-              4.9
+              {data?.metrics?.registered_students?.value ?? 18}
             </div>
+            <span className="font-sans text-xs font-medium text-slate-400 mt-1 block">NSW active learners</span>
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
-            <span className="font-sans text-xs font-semibold text-slate-500">Lessons this month</span>
+            <span className="font-sans text-xs font-semibold text-slate-500">Total Revenue</span>
             <div className="font-heading font-black text-3xl text-slate-900 mt-1">
-              342
+              {data?.metrics?.total_revenue?.formatted ?? "$1,015.00"}
             </div>
+            <span className="font-sans text-xs font-medium text-emerald-600 mt-1 block font-bold">Paid to date</span>
           </div>
         </div>
 
@@ -235,10 +225,10 @@ export default function DashboardPage() {
             </div>
 
             <button
-              onClick={() => router.push("/instructor-matching")}
+              onClick={() => router.push("/bookings")}
               className="btn-white mt-4 w-full py-2 px-3 text-xs shadow-subtle text-center"
             >
-              Match Unassigned Bookings
+              View All Bookings
             </button>
           </div>
 

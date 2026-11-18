@@ -167,6 +167,20 @@ $router->get('/api/content/gallery', 'ContentController@getGallery');
 $router->post('/api/content/gallery', 'ContentController@storeGallery');
 $router->delete('/api/content/gallery/{id}', 'ContentController@deleteGallery');
 
+// --- Blogs Dedicated Module ---
+$router->get('/api/blogs', 'BlogController@index');
+$router->get('/api/blogs/{id}', 'BlogController@show');
+$router->post('/api/blogs', 'BlogController@store');
+$router->put('/api/blogs/{id}', 'BlogController@update');
+$router->delete('/api/blogs/{id}', 'BlogController@delete');
+
+// --- Inquiries & Student Leads ---
+$router->get('/api/inquiries', 'InquiryController@index');
+$router->get('/api/inquiries/{id}', 'InquiryController@show');
+$router->post('/api/inquiries', 'InquiryController@store');
+$router->put('/api/inquiries/{id}', 'InquiryController@update');
+$router->delete('/api/inquiries/{id}', 'InquiryController@delete');
+
 // --- Reports & Analytics ---
 $router->get('/api/reports/analytics', 'ReportController@getAnalytics');
 $router->get('/api/reports/export', 'ReportController@exportCsv');
@@ -185,6 +199,13 @@ $router->post('/api/settings/users', 'SettingsController@storeUser');
 $router->put('/api/settings/users/{id}', 'SettingsController@updateUser');
 $router->delete('/api/settings/users/{id}', 'SettingsController@deleteUser');
 $router->post('/api/settings/role-permissions', 'SettingsController@updateRolePermissions');
+
+// --- Sub-Admins & Sidebar Section Permissions ---
+$router->get('/api/subadmins', 'SubAdminController@index');
+$router->post('/api/subadmins', 'SubAdminController@store');
+$router->put('/api/subadmins/{id}', 'SubAdminController@update');
+$router->delete('/api/subadmins/{id}', 'SubAdminController@delete');
+$router->get('/api/subadmins/activity', 'SubAdminController@activity');
 
 return $router;
 

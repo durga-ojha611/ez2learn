@@ -57,6 +57,16 @@ class AuthController {
 
         unset($user['password_hash']);
         $user['permissions'] = $permissions;
+        $decodedSections = json_decode($user['accessible_sections'] ?? '[]', true);
+        if ($user['role_name'] === 'super_admin' || empty($decodedSections)) {
+            $user['accessible_sections'] = [
+                'dashboard', 'bookings', 'inquiries', 'instructors', 'students',
+                'calendar', 'services', 'payments', 'locations', 'reviews',
+                'blogs', 'website_content', 'notifications', 'settings'
+            ];
+        } else {
+            $user['accessible_sections'] = $decodedSections;
+        }
 
         Response::success([
             'token' => $token,
@@ -75,6 +85,17 @@ class AuthController {
         ");
         $permStmt->execute([$user['role_id']]);
         $user['permissions'] = $permStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        $decodedSections = json_decode($user['accessible_sections'] ?? '[]', true);
+        if ($user['role_name'] === 'super_admin' || empty($decodedSections)) {
+            $user['accessible_sections'] = [
+                'dashboard', 'bookings', 'inquiries', 'instructors', 'students',
+                'calendar', 'services', 'payments', 'locations', 'reviews',
+                'blogs', 'website_content', 'notifications', 'settings'
+            ];
+        } else {
+            $user['accessible_sections'] = $decodedSections;
+        }
 
         Response::success($user, 'Authenticated user details');
     }

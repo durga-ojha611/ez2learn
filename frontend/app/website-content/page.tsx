@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PageHeading } from "@/components/common/PageHeading";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { Modal } from "@/components/common/Modal";
 import { apiFetch } from "@/lib/api";
@@ -197,27 +198,22 @@ export default function WebsiteContentPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 w-full select-none">
-        {/* Page Title & Action Buttons matching Reference Image */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-heading font-black text-3xl sm:text-4xl text-slate-900 tracking-tight leading-tight">
-              Website Content
-            </h1>
-            <p className="font-sans font-medium text-sm text-slate-500 mt-1">
-              Live editor for public marketing pages, blog articles, FAQs and student pass gallery.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            {activeTab === "faqs" ? (
+      <div className="space-y-6 w-full min-w-0 select-none pb-16">
+        {/* Page Title with Full-Width Rectangle Badge Heading */}
+        <PageHeading
+          icon={Globe}
+          title="Website CMS & Content"
+          subtitle="Live editor for public marketing pages, FAQs, policies, and pass gallery"
+          badge="ezy2learn.com.au"
+          actions={
+            activeTab === "faqs" ? (
               <button
                 onClick={() => {
                   setEditingFaqId(null);
                   setFaqForm({ question: "", answer: "", category: "General", sort_order: 1 });
                   setFaqModalOpen(true);
                 }}
-                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-bold text-sm shadow-xs transition-all"
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-bold text-sm shadow-xs transition-all cursor-pointer"
               >
                 <span>+ Add FAQ</span>
               </button>
@@ -236,14 +232,14 @@ export default function WebsiteContentPage() {
                   });
                   setBlogModalOpen(true);
                 }}
-                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-bold text-sm shadow-xs transition-all"
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-bold text-sm shadow-xs transition-all cursor-pointer"
               >
                 <span>+ New Article</span>
               </button>
             ) : activeTab === "gallery" ? (
               <button
                 onClick={() => setGalleryModalOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-bold text-sm shadow-xs transition-all"
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-bold text-sm shadow-xs transition-all cursor-pointer"
               >
                 <span>+ Add Photo</span>
               </button>
@@ -251,13 +247,13 @@ export default function WebsiteContentPage() {
               <button
                 onClick={() => handleSavePage(activeTab)}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-bold text-sm shadow-xs transition-all disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-bold text-sm shadow-xs transition-all disabled:opacity-50 cursor-pointer"
               >
                 <span>{saving ? "Saving..." : "Save published changes"}</span>
               </button>
-            )}
-          </div>
-        </div>
+            )
+          }
+        />
 
         {/* 4 Stat KPI Cards matching Reference Image */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

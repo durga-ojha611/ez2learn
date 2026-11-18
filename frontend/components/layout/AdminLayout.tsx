@@ -9,16 +9,31 @@ import { Drawer } from "@/components/common/Drawer";
 import { getStoredUser, clearAuthSession, isAuthenticated } from "@/lib/auth";
 import { apiFetch } from "@/lib/api";
 import { AdminUser, NotificationItem } from "@/types";
-import { Bell, CheckCircle2, Clock } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
+const ROUTE_SECTION_MAP: Array<{ prefix: string; key: string }> = [
+  { prefix: "/dashboard", key: "dashboard" },
+  { prefix: "/bookings", key: "bookings" },
+  { prefix: "/inquiries", key: "inquiries" },
+  { prefix: "/instructors", key: "instructors" },
+  { prefix: "/students", key: "students" },
+  { prefix: "/calendar", key: "calendar" },
+  { prefix: "/services", key: "services" },
+  { prefix: "/payments", key: "payments" },
+  { prefix: "/locations", key: "locations" },
+  { prefix: "/reviews", key: "reviews" },
+  { prefix: "/blogs", key: "blogs" },
+  { prefix: "/website-content", key: "website_content" },
+  { prefix: "/notifications", key: "notifications" },
+  { prefix: "/settings", key: "settings" },
+];
+
 export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const router = useRouter();
-  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifDrawerOpen, setNotifDrawerOpen] = useState(false);
@@ -33,6 +48,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     }
     const user = getStoredUser();
     setCurrentUser(user);
+
+    // RBAC: Check route permission for sub-admins
+    if (user && user.role_name !== "super_admin" && user.email !== "admin@ezy2learn.com.au") {
+      const allowed = user.accessible_sections || [];
+      if (!allowed.includes("*") && allowed.length > 0) {
+        const path = window.location.pathname;
+        const matched = ROUTE_SECTION_MAP.find((m) => path.startsWith(m.prefix));
+        if (matched && !allowed.includes(matched.key)) {
+          // Sub-admin has attempted to access an unticked section!
+          // Find first allowed section
+          const firstAllowed = ROUTE_SECTION_MAP.find((m) => allowed.includes(m.key));
+          if (firstAllowed) {
+            router.replace(firstAllowed.prefix);
+          }
+        }
+      }
+    }
 
     // Fetch notifications
     loadNotifications();
@@ -79,7 +111,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] flex flex-col antialiased selection:bg-[#FAB10B]/30">
-      {/* Top Header - Single Box with Logo, Search, Notification Toggle, Admin Profile */}
+      {/* Top Header */}
       <Header
         onToggleSidebar={() => setMobileOpen(true)}
         currentUser={currentUser}
@@ -89,24 +121,18 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         unreadNotificationsCount={unreadCount}
       />
 
-      {/* Body Area with Sidebar and Edge-to-Edge Content Canvas */}
+      {/* Body Area with Sidebar and Content Canvas */}
       <div className="flex-1 flex relative bg-[#F8F9FA]">
         {/* Sidebar */}
         <Sidebar
-          collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed(!collapsed)}
           currentUser={currentUser}
           onLogout={handleLogout}
           mobileOpen={mobileOpen}
           onCloseMobile={() => setMobileOpen(false)}
         />
 
-        {/* Main Content Area - Soft Background, White Cards, Minimal & Elegant */}
-        <div
-          className={`flex-1 flex flex-col w-full min-w-0 bg-[#F8F9FA] transition-all duration-300 ${
-            collapsed ? "lg:pl-20" : "lg:pl-72"
-          }`}
-        >
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col w-full min-w-0 bg-[#F8F9FA] lg:pl-72 transition-all duration-200">
           <main className="flex-1 p-4 sm:p-6 lg:p-8 w-full min-w-0 bg-[#F8F9FA]">
             {children}
           </main>
@@ -179,4 +205,3 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     </div>
   );
 };
-

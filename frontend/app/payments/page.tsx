@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PageHeading } from "@/components/common/PageHeading";
 import { Drawer } from "@/components/common/Drawer";
 import { Modal } from "@/components/common/Modal";
 import { apiFetch } from "@/lib/api";
@@ -64,230 +65,7 @@ export interface PaymentRecord {
 }
 
 // Initial mockup transactions matching uploaded reference image media_1794912752389_fb1232c6.jpg
-const INITIAL_TRANSACTIONS: PaymentRecord[] = [
-  {
-    id: 101,
-    transaction_id: "TXN-10245",
-    student_id: 1,
-    student_name: "John Smith",
-    student_email: "john.smith@gmail.com",
-    student_phone: "+61 412 889 101",
-    student_avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-    booking_id: 1,
-    booking_code: "BK-10032",
-    service_name: "Standard 2-Hour Intensive Lesson",
-    date_formatted: "17 Nov 2026 · 10:24 AM",
-    raw_date: "2026-11-17T10:24:00",
-    payment_method: "credit_card",
-    payment_method_label: "Credit Card",
-    amount_aud: 150.0,
-    discount_aud: 0.0,
-    final_amount_aud: 150.0,
-    payment_status: "successful",
-    receipt_number: "RCP-10245",
-    gateway_reference: "ch_3M892019482L9m",
-  },
-  {
-    id: 102,
-    transaction_id: "TXN-10244",
-    student_id: 2,
-    student_name: "Sarah Wilson",
-    student_email: "sarah.wilson@outlook.com",
-    student_phone: "+61 422 778 202",
-    student_avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
-    booking_id: 2,
-    booking_code: "BK-10031",
-    service_name: "Learner 1-Hour Driving Session",
-    date_formatted: "17 Nov 2026 · 09:50 AM",
-    raw_date: "2026-11-17T09:50:00",
-    payment_method: "upi",
-    payment_method_label: "UPI",
-    amount_aud: 75.0,
-    discount_aud: 0.0,
-    final_amount_aud: 75.0,
-    payment_status: "pending",
-    receipt_number: "RCP-10244",
-    gateway_reference: "upi_89201847192",
-  },
-  {
-    id: 103,
-    transaction_id: "TXN-10243",
-    student_id: 3,
-    student_name: "Michael Brown",
-    student_email: "michael.b@yahoo.com.au",
-    student_phone: "+61 433 667 303",
-    student_avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
-    booking_id: 3,
-    booking_code: "BK-10030",
-    service_name: "RMS Driving Test Route Preparation",
-    date_formatted: "16 Nov 2026 · 04:12 PM",
-    raw_date: "2026-11-16T16:12:00",
-    payment_method: "credit_card",
-    payment_method_label: "Credit Card",
-    amount_aud: 120.0,
-    discount_aud: 0.0,
-    final_amount_aud: 120.0,
-    payment_status: "failed",
-    receipt_number: "RCP-10243",
-    gateway_reference: "ch_declined_insufficient_funds",
-  },
-  {
-    id: 104,
-    transaction_id: "TXN-10242",
-    student_id: 4,
-    student_name: "Emma Davis",
-    student_email: "emma.davis@gmail.com",
-    student_phone: "+61 444 556 404",
-    student_avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80",
-    booking_id: 4,
-    booking_code: "BK-10029",
-    service_name: "RMS Warm-Up Lesson + Test Car Hire",
-    date_formatted: "16 Nov 2026 · 01:20 PM",
-    raw_date: "2026-11-16T13:20:00",
-    payment_method: "paypal",
-    payment_method_label: "PayPal",
-    amount_aud: 200.0,
-    discount_aud: 0.0,
-    final_amount_aud: 200.0,
-    payment_status: "refunded",
-    receipt_number: "RCP-10242",
-    gateway_reference: "pp_txn_992104812",
-    refund_amount: 200.0,
-    refund_reason: "Rescheduled test booking refunded per school cancellation policy",
-  },
-  {
-    id: 105,
-    transaction_id: "TXN-10241",
-    student_id: 5,
-    student_name: "Daniel Clark",
-    student_email: "daniel.clark@outlook.com",
-    student_phone: "+61 455 445 505",
-    student_avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80",
-    booking_id: 5,
-    booking_code: "BK-10028",
-    service_name: "Overseas Licence Conversion Lesson",
-    date_formatted: "15 Nov 2026 · 11:30 AM",
-    raw_date: "2026-11-15T11:30:00",
-    payment_method: "credit_card",
-    payment_method_label: "Credit Card",
-    amount_aud: 100.0,
-    discount_aud: 0.0,
-    final_amount_aud: 100.0,
-    payment_status: "successful",
-    receipt_number: "RCP-10241",
-    gateway_reference: "ch_3M4o92810kL7mB",
-  },
-  {
-    id: 106,
-    transaction_id: "TXN-10240",
-    student_id: 6,
-    student_name: "Aisha Khan",
-    student_email: "aisha.khan@gmail.com",
-    student_phone: "+61 412 345 678",
-    student_avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80",
-    booking_id: 6,
-    booking_code: "BK-10027",
-    service_name: "Confidence 10 Lesson Package",
-    date_formatted: "15 Nov 2026 · 09:15 AM",
-    raw_date: "2026-11-15T09:15:00",
-    payment_method: "credit_card",
-    payment_method_label: "Credit Card",
-    amount_aud: 740.0,
-    discount_aud: 0.0,
-    final_amount_aud: 740.0,
-    payment_status: "successful",
-    receipt_number: "RCP-10240",
-    gateway_reference: "ch_3M9284019284Lm",
-  },
-  {
-    id: 107,
-    transaction_id: "TXN-10239",
-    student_id: 7,
-    student_name: "Liam O'Connor",
-    student_email: "liam.oc@hotmail.com",
-    student_phone: "+61 423 456 789",
-    student_avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80",
-    booking_id: 7,
-    booking_code: "BK-10026",
-    service_name: "Standard 1-Hour Manual Lesson",
-    date_formatted: "14 Nov 2026 · 02:45 PM",
-    raw_date: "2026-11-14T14:45:00",
-    payment_method: "afterpay",
-    payment_method_label: "Afterpay",
-    amount_aud: 85.0,
-    discount_aud: 0.0,
-    final_amount_aud: 85.0,
-    payment_status: "successful",
-    receipt_number: "RCP-10239",
-    gateway_reference: "aft_99201948192",
-  },
-  {
-    id: 108,
-    transaction_id: "TXN-10238",
-    student_id: 8,
-    student_name: "Maya Rao",
-    student_email: "maya.rao@gmail.com",
-    student_phone: "+61 434 567 890",
-    student_avatar: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80",
-    booking_id: 8,
-    booking_code: "BK-10025",
-    service_name: "Starter 5-Lesson Package",
-    date_formatted: "14 Nov 2026 · 11:00 AM",
-    raw_date: "2026-11-14T11:00:00",
-    payment_method: "bank_transfer",
-    payment_method_label: "Bank Transfer",
-    amount_aud: 395.0,
-    discount_aud: 0.0,
-    final_amount_aud: 395.0,
-    payment_status: "pending",
-    receipt_number: "RCP-10238",
-    gateway_reference: "bt_ref_parramatta_rao",
-  },
-  {
-    id: 109,
-    transaction_id: "TXN-10237",
-    student_id: 9,
-    student_name: "Noah Bennett",
-    student_email: "noah.bennett@outlook.com",
-    student_phone: "+61 445 678 901",
-    student_avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80",
-    booking_id: 9,
-    booking_code: "BK-10024",
-    service_name: "Driving Test Package + Warm-Up",
-    date_formatted: "13 Nov 2026 · 03:30 PM",
-    raw_date: "2026-11-13T15:30:00",
-    payment_method: "credit_card",
-    payment_method_label: "Credit Card",
-    amount_aud: 210.0,
-    discount_aud: 0.0,
-    final_amount_aud: 210.0,
-    payment_status: "successful",
-    receipt_number: "RCP-10237",
-    gateway_reference: "ch_3M890123984Lm",
-  },
-  {
-    id: 110,
-    transaction_id: "TXN-10236",
-    student_id: 10,
-    student_name: "Chen Wei",
-    student_email: "chen.wei@gmail.com",
-    student_phone: "+61 456 789 012",
-    student_avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
-    booking_id: 10,
-    booking_code: "BK-10023",
-    service_name: "Extended 90-Min Lesson",
-    date_formatted: "13 Nov 2026 · 10:00 AM",
-    raw_date: "2026-11-13T10:00:00",
-    payment_method: "credit_card",
-    payment_method_label: "Credit Card",
-    amount_aud: 125.0,
-    discount_aud: 0.0,
-    final_amount_aud: 125.0,
-    payment_status: "failed",
-    receipt_number: "RCP-10236",
-    gateway_reference: "ch_expired_card_token",
-  },
-];
+const INITIAL_TRANSACTIONS: PaymentRecord[] = [];
 
 export default function PaymentsPage() {
   const [transactions, setTransactions] = useState<PaymentRecord[]>(INITIAL_TRANSACTIONS);
@@ -401,11 +179,7 @@ export default function PaymentsPage() {
         });
 
         // Merge initial mockup items at top for instant visual alignment with image, then db items
-        setTransactions((prev) => {
-          const existingIds = new Set(INITIAL_TRANSACTIONS.map((t) => t.transaction_id));
-          const newUnique = mappedDbPayments.filter((t) => !existingIds.has(t.transaction_id));
-          return [...INITIAL_TRANSACTIONS, ...newUnique];
-        });
+        setTransactions(mappedDbPayments);
       }
     } catch (err) {
       console.warn("Using offline payment data:", err);
@@ -415,12 +189,25 @@ export default function PaymentsPage() {
   };
 
   // KPI Overview calculations matching mockup numbers: $24,850 Revenue, 186 Successful, 12 Pending
-  const totalRevenue = 24850;
-  const successfulCount = 186;
-  const pendingCount = 12;
-  const failedCount = 0;
-  const refundedCount = 8;
-  const totalCount = 198;
+  // Dynamic live KPI calculations from real database records
+  const totalRevenue = useMemo(() => {
+    return transactions
+      .filter((t) => t.payment_status === "successful")
+      .reduce((sum, t) => sum + (t.amount_aud || 0), 0);
+  }, [transactions]);
+  const successfulCount = useMemo(() => {
+    return transactions.filter((t) => t.payment_status === "successful").length;
+  }, [transactions]);
+  const pendingCount = useMemo(() => {
+    return transactions.filter((t) => t.payment_status === "pending").length;
+  }, [transactions]);
+  const failedCount = useMemo(() => {
+    return transactions.filter((t) => t.payment_status === "failed").length;
+  }, [transactions]);
+  const refundedCount = useMemo(() => {
+    return transactions.filter((t) => t.payment_status === "refunded").length;
+  }, [transactions]);
+  const totalCount = transactions.length;
 
   // Filtered transactions
   const filteredTransactions = transactions.filter((t) => {
@@ -743,30 +530,23 @@ export default function PaymentsPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 w-full select-none pb-12">
-        {/* ========================================================================= */}
-        {/* 1. TOP HEADER & EXPORT BUTTON (matching Reference Image)                  */}
-        {/* ========================================================================= */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-heading font-black text-2xl sm:text-3xl text-slate-900 tracking-tight">
-              Payments
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Manage transactions and payments
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
+      <div className="space-y-6 w-full min-w-0 select-none pb-12">
+        {/* 1. TOP HEADER with Full-Width Rectangle Badge Heading */}
+        <PageHeading
+          icon={CreditCard}
+          title="Payments & Invoices"
+          subtitle="Manage student payments, refunds, and financial transactions"
+          badge="AUD ($)"
+          actions={
             <button
               onClick={handleExportCsv}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-heading font-bold text-xs sm:text-sm shadow-xs transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-heading font-bold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer"
             >
               <Download className="w-4 h-4 text-slate-500" />
-              <span>Export</span>
+              <span>Export CSV</span>
             </button>
-          </div>
-        </div>
+          }
+        />
 
         {/* ========================================================================= */}
         {/* 2. OVERVIEW KPI CARDS (Total Revenue, Successful, Pending)                */}

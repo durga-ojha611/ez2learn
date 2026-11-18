@@ -82,24 +82,30 @@ export default function InstructorProfilePage() {
 
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!instructor) return;
     setSavingEdit(true);
-    await new Promise((r) => setTimeout(r, 600));
-    if (instructor) {
-      setInstructor({
-        ...instructor,
-        name: editForm.name,
-        email: editForm.email,
-        phone: editForm.phone,
-        address: editForm.address,
-        accreditation_number: editForm.accreditation_number,
-        hourly_rate: editForm.hourly_rate,
-        transmission: editForm.transmission,
-        status: editForm.status,
+    try {
+      await apiFetch(`/api/instructors/${instructor.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          name: editForm.name,
+          email: editForm.email,
+          phone: editForm.phone,
+          address: editForm.address,
+          accreditation_number: editForm.accreditation_number,
+          hourly_rate: editForm.hourly_rate,
+          transmission: editForm.transmission,
+          status: editForm.status,
+        }),
       });
+      loadInstructor();
+      alert("Instructor details updated successfully in database!");
+      setEditDrawerOpen(false);
+    } catch (err: any) {
+      alert(err.message || "Failed to update instructor");
+    } finally {
+      setSavingEdit(false);
     }
-    alert("Instructor details updated successfully!");
-    setSavingEdit(false);
-    setEditDrawerOpen(false);
   };
 
   const handleApplyTpl = (tplKey: string) => {

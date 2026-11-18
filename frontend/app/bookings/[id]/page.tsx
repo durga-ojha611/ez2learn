@@ -44,13 +44,8 @@ export default function BookingDetailsPage() {
   const rawId = params.id as string;
   const numId = parseInt(rawId, 10);
 
-  const [booking, setBooking] = useState<BookingRowItem>(() => {
-    const found = DEFAULT_BOOKINGS.find(
-      (b) => b.id === numId || b.booking_code.toLowerCase() === rawId.toLowerCase()
-    );
-    return found || DEFAULT_BOOKINGS[0];
-  });
-  const [loading, setLoading] = useState(false);
+  const [booking, setBooking] = useState<BookingRowItem | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Side Window Drawers State
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
@@ -71,7 +66,7 @@ export default function BookingDetailsPage() {
     duration_minutes: 60,
     pickup_location: "",
     dropoff_location: "",
-    status: "upcoming" as "upcoming" | "pending" | "completed" | "cancelled",
+    status: "upcoming" as "upcoming" | "confirmed" | "pending" | "completed" | "cancelled",
     student_notes: "",
     admin_notes: "",
   });
@@ -92,17 +87,33 @@ export default function BookingDetailsPage() {
   // Cancel State
   const [cancellationReason, setCancellationReason] = useState("");
 
-  const INSTRUCTOR_OPTIONS = [
-    { name: "Daniel Okafor", code: "INST-001", vehicle: "Toyota Camry", transmission: "Manual" },
-    { name: "Priya Nair", code: "INST-002", vehicle: "Honda Civic", transmission: "Automatic" },
-    { name: "Marcus Bell", code: "INST-003", vehicle: "Toyota Corolla", transmission: "Manual" },
-    { name: "Sofia Reyes", code: "INST-004", vehicle: "Hyundai i30", transmission: "Automatic" },
-    { name: "David Kim", code: "INST-005", vehicle: "Mazda 3", transmission: "Manual" },
-  ];
+  const [instructorOptions, setInstructorOptions] = useState<
+    { id: number; name: string; code: string; vehicle: string; transmission: string }[]
+  >([]);
 
   useEffect(() => {
     loadBookingFromApi();
+    loadInstructors();
   }, [rawId]);
+
+  const loadInstructors = async () => {
+    try {
+      const res = await apiFetch("/api/instructors?limit=100");
+      if (res.success && Array.isArray(res.data)) {
+        setInstructorOptions(
+          res.data.map((i: any) => ({
+            id: i.id,
+            name: i.name,
+            code: i.instructor_code || `INS-${i.id}`,
+            vehicle: i.vehicle || `${i.vehicle_make || "Toyota"} ${i.vehicle_model || "Corolla"}`,
+            transmission: i.transmission === "automatic" ? "Automatic" : "Manual",
+          }))
+        );
+      }
+    } catch (err) {
+      console.warn("Could not load instructors list", err);
+    }
+  };
 
   const loadBookingFromApi = async () => {
     try {
@@ -160,36 +171,36 @@ export default function BookingDetailsPage() {
 
   // Actions
   const handleOpenEdit = () => {
-    setEditForm({
-      student_name: booking.student_name,
-      student_email: booking.student_email,
-      student_phone: booking.student_phone,
-      instructor_name: booking.instructor_name,
-      lesson_type: booking.lesson_type,
-      lesson_date: booking.lesson_date,
-      start_time: booking.start_time,
-      duration_minutes: booking.duration_minutes,
-      pickup_location: booking.pickup_location,
-      dropoff_location: booking.dropoff_location,
-      status: booking.status,
-      student_notes: booking.student_notes,
-      admin_notes: booking.admin_notes,
-    });
-    setEditDrawerOpen(true);
+    if (!booking) return;
+    router.push(`/bookings/${booking.id}/edit`);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBooking({
-      ...booking,
-      ...editForm,
-      formatted_datetime: `${editForm.lesson_date}, ${editForm.start_time}`,
-    });
-    setEditDrawerOpen(false);
-    alert(`Booking #${booking.booking_code} updated successfully!`);
+    if (!booking) return;
+    try {
+      await apiFetch(`/api/bookings/${booking.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          lesson_date: editForm.lesson_date,
+          start_time: editForm.start_time,
+          duration_minutes: editForm.duration_minutes,
+          pickup_address: editForm.pickup_location,
+          dropoff_address: editForm.dropoff_location,
+          booking_status: editForm.status === "upcoming" ? "confirmed" : editForm.status,
+          special_notes: editForm.student_notes,
+        }),
+      });
+      loadBookingFromApi();
+      setEditDrawerOpen(false);
+      alert(`Booking #${booking.booking_code} updated successfully in database!`);
+    } catch (err: any) {
+      alert(err.message || "Failed to update booking");
+    }
   };
 
   const handleOpenMessage = () => {
+    if (!booking) return;
     setMessageText(
       `Hi ${booking.student_name}, regarding your booking #${booking.booking_code} on ${booking.formatted_datetime} with ${booking.instructor_name}: `
     );
@@ -198,64 +209,100 @@ export default function BookingDetailsPage() {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageText.trim()) return;
+    if (!booking || !messageText.trim()) return;
     setSendingMsg(true);
+    const stuName = booking.student_name;
+    const stuPhone = booking.student_phone;
     setTimeout(() => {
       setSendingMsg(false);
       setMessageDrawerOpen(false);
       alert(
-        `Message dispatched via ${messageChannel.toUpperCase()} to ${booking.student_name} (${booking.student_phone})!`
+        `Message dispatched via ${messageChannel.toUpperCase()} to ${stuName} (${stuPhone})!`
       );
     }, 600);
   };
 
   const handleOpenAssign = () => {
+    if (!booking) return;
     setNewInstructorName(booking.instructor_name);
     setAssignDrawerOpen(true);
   };
 
-  const handleSaveAssign = (e: React.FormEvent) => {
+  const handleSaveAssign = async (e: React.FormEvent) => {
     e.preventDefault();
-    const inst = INSTRUCTOR_OPTIONS.find((i) => i.name === newInstructorName);
-    setBooking({
-      ...booking,
-      instructor_name: newInstructorName,
-      instructor_code: inst?.code || booking.instructor_code,
-      assigned_vehicle: inst?.vehicle || booking.assigned_vehicle,
-      admin_notes: `${booking.admin_notes} | Reassigned to ${newInstructorName} on ${new Date().toLocaleDateString()}`,
-    });
-    setAssignDrawerOpen(false);
-    alert(`Instructor updated to ${newInstructorName}!`);
+    if (!booking) return;
+    const inst = instructorOptions.find((i) => i.name === newInstructorName);
+    if (!inst) {
+      alert("Please select a valid instructor");
+      return;
+    }
+    try {
+      await apiFetch(`/api/bookings/${booking.id}/assign`, {
+        method: "PATCH",
+        body: JSON.stringify({ instructor_id: inst.id }),
+      });
+      loadBookingFromApi();
+      setAssignDrawerOpen(false);
+      alert(`Instructor successfully assigned to ${inst.name}!`);
+    } catch (err: any) {
+      alert(err.message || "Failed to assign instructor");
+    }
   };
 
   const handleOpenReschedule = () => {
+    if (!booking) return;
     setRescheduleDate(booking.lesson_date);
     setRescheduleTime(booking.start_time);
     setRescheduleReason("");
     setRescheduleDrawerOpen(true);
   };
 
-  const handleSaveReschedule = (e: React.FormEvent) => {
+  const handleSaveReschedule = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBooking({
-      ...booking,
-      lesson_date: rescheduleDate,
-      start_time: rescheduleTime,
-      formatted_datetime: `${rescheduleDate}, ${rescheduleTime}`,
-      rescheduling_history: `Rescheduled on ${new Date().toLocaleDateString()}: ${rescheduleReason || "Admin update"}`,
-    });
-    setRescheduleDrawerOpen(false);
-    alert(`Booking #${booking.booking_code} rescheduled to ${rescheduleDate} at ${rescheduleTime}!`);
+    if (!booking) return;
+    try {
+      await apiFetch(`/api/bookings/${booking.id}/reschedule`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          new_date: rescheduleDate,
+          new_start_time: rescheduleTime,
+          reason: rescheduleReason || "Admin update",
+        }),
+      });
+      loadBookingFromApi();
+      setRescheduleDrawerOpen(false);
+      alert(`Booking #${booking.booking_code} rescheduled to ${rescheduleDate} at ${rescheduleTime}!`);
+    } catch (err: any) {
+      alert(err.message || "Failed to reschedule booking");
+    }
   };
 
-  const handleConfirm = () => {
-    setBooking({ ...booking, status: "upcoming" });
-    alert(`Booking #${booking.booking_code} has been CONFIRMED!`);
+  const handleConfirm = async () => {
+    if (!booking) return;
+    try {
+      await apiFetch(`/api/bookings/${booking.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "confirmed", comment: "Confirmed by admin" }),
+      });
+      loadBookingFromApi();
+      alert(`Booking #${booking.booking_code} has been CONFIRMED!`);
+    } catch (err: any) {
+      alert(err.message || "Failed to update status");
+    }
   };
 
-  const handleComplete = () => {
-    setBooking({ ...booking, status: "completed" });
-    alert(`Booking #${booking.booking_code} marked as COMPLETED! Logbook hours verified.`);
+  const handleComplete = async () => {
+    if (!booking) return;
+    try {
+      await apiFetch(`/api/bookings/${booking.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "completed", comment: "Marked completed by admin" }),
+      });
+      loadBookingFromApi();
+      alert(`Booking #${booking.booking_code} marked as COMPLETED! Logbook hours verified.`);
+    } catch (err: any) {
+      alert(err.message || "Failed to update status");
+    }
   };
 
   const handlePrintReceipt = () => {
@@ -263,6 +310,26 @@ export default function BookingDetailsPage() {
       window.print();
     }
   };
+
+  if (loading) {
+    return (
+      <AdminLayout>
+        <div className="py-24 text-center text-slate-500 font-medium">
+          Loading booking details...
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (!booking) {
+    return (
+      <AdminLayout>
+        <div className="py-24 text-center text-rose-600 font-bold">
+          Booking record not found.
+        </div>
+      </AdminLayout>
+    );
+  }
 
   return (
     <AdminLayout>
@@ -974,7 +1041,7 @@ export default function BookingDetailsPage() {
             </p>
 
             <div className="space-y-2">
-              {INSTRUCTOR_OPTIONS.map((inst) => {
+              {instructorOptions.map((inst) => {
                 const isSelected = newInstructorName === inst.name;
                 return (
                   <div
@@ -1125,14 +1192,21 @@ export default function BookingDetailsPage() {
                 Keep Booking
               </button>
               <button
-                onClick={() => {
-                  setBooking({
-                    ...booking,
-                    status: "cancelled",
-                    cancellation_reason: cancellationReason || "Admin cancellation",
-                  });
-                  setCancelModalOpen(false);
-                  alert(`Booking #${booking.booking_code} marked as CANCELLED.`);
+                onClick={async () => {
+                  try {
+                    await apiFetch(`/api/bookings/${booking.id}/status`, {
+                      method: "PATCH",
+                      body: JSON.stringify({
+                        status: "cancelled",
+                        comment: cancellationReason || "Admin cancellation",
+                      }),
+                    });
+                    loadBookingFromApi();
+                    setCancelModalOpen(false);
+                    alert(`Booking #${booking.booking_code} marked as CANCELLED in database.`);
+                  } catch (err: any) {
+                    alert(err.message || "Failed to cancel booking");
+                  }
                 }}
                 className="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold text-xs hover:bg-rose-700"
               >

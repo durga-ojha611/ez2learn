@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PageHeading } from "@/components/common/PageHeading";
 import { apiFetch } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { ReviewItem } from "@/types";
@@ -28,19 +29,19 @@ export default function ReviewsPage() {
   const [selectedReview, setSelectedReview] = useState<ReviewItem | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
-  // Statistics
+  // Statistics (dynamically populated from MySQL API)
   const [stats, setStats] = useState({
-    total_reviews: 124,
-    average_rating: 4.6,
-    five_star_reviews: 98,
-    stars_5: 98,
-    stars_4: 14,
-    stars_3: 7,
-    stars_2: 3,
-    stars_1: 2,
+    total_reviews: 0,
+    average_rating: 0,
+    five_star_reviews: 0,
+    stars_5: 0,
+    stars_4: 0,
+    stars_3: 0,
+    stars_2: 0,
+    stars_1: 0,
   });
 
-  const [total, setTotal] = useState(124);
+  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [limit] = useState(7);
   const [loading, setLoading] = useState(true);
@@ -150,11 +151,10 @@ export default function ReviewsPage() {
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`${size} ${
-              star <= rating
-                ? "text-[#FAB10B] fill-[#FAB10B]"
-                : "text-slate-200 fill-slate-200"
-            }`}
+            className={`${size} ${star <= rating
+              ? "text-[#FAB10B] fill-[#FAB10B]"
+              : "text-slate-200 fill-slate-200"
+              }`}
           />
         ))}
       </div>
@@ -163,16 +163,14 @@ export default function ReviewsPage() {
 
   return (
     <AdminLayout>
-      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto min-h-screen">
-        {/* Page Title & Subtitle */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-heading font-black text-slate-900 tracking-tight">
-            Reviews
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-            Manage student feedback and monitor instructor performance.
-          </p>
-        </div>
+      <div className="space-y-6 w-full min-w-0 select-none pb-16">
+        {/* Page Title with Full-Width Rectangle Badge Heading */}
+        <PageHeading
+          icon={Star}
+          title="Customer Reviews & Ratings"
+          subtitle="Manage student feedback, rating scores, and public testimonials"
+          badge="Verified Students"
+        />
 
         {/* 1. Overview Statistics (3 Clean Cards without Response Card) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -229,11 +227,10 @@ export default function ReviewsPage() {
               setActiveTab("all");
               setPage(1);
             }}
-            className={`px-4 py-2 rounded-full transition-all shrink-0 cursor-pointer ${
-              activeTab === "all"
-                ? "bg-[#0B1528] text-white shadow-xs font-bold"
-                : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
-            }`}
+            className={`px-4 py-2 rounded-full transition-all shrink-0 cursor-pointer ${activeTab === "all"
+              ? "bg-[#0B1528] text-white shadow-xs font-bold"
+              : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
+              }`}
           >
             All Reviews ({stats.total_reviews})
           </button>
@@ -243,11 +240,10 @@ export default function ReviewsPage() {
               setActiveTab("5");
               setPage(1);
             }}
-            className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
-              activeTab === "5"
-                ? "bg-[#0B1528] text-white shadow-xs font-bold"
-                : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
-            }`}
+            className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${activeTab === "5"
+              ? "bg-[#0B1528] text-white shadow-xs font-bold"
+              : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
+              }`}
           >
             <Star className="w-3.5 h-3.5 fill-[#FAB10B] text-[#FAB10B]" />
             5 Stars ({stats.stars_5})
@@ -258,11 +254,10 @@ export default function ReviewsPage() {
               setActiveTab("4");
               setPage(1);
             }}
-            className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
-              activeTab === "4"
-                ? "bg-[#0B1528] text-white shadow-xs font-bold"
-                : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
-            }`}
+            className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${activeTab === "4"
+              ? "bg-[#0B1528] text-white shadow-xs font-bold"
+              : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
+              }`}
           >
             <Star className="w-3.5 h-3.5 fill-[#FAB10B] text-[#FAB10B]" />
             4 Stars ({stats.stars_4})
@@ -273,11 +268,10 @@ export default function ReviewsPage() {
               setActiveTab("3");
               setPage(1);
             }}
-            className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
-              activeTab === "3"
-                ? "bg-[#0B1528] text-white shadow-xs font-bold"
-                : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
-            }`}
+            className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${activeTab === "3"
+              ? "bg-[#0B1528] text-white shadow-xs font-bold"
+              : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
+              }`}
           >
             <Star className="w-3.5 h-3.5 fill-[#FAB10B] text-[#FAB10B]" />
             3 Stars ({stats.stars_3})
@@ -288,11 +282,10 @@ export default function ReviewsPage() {
               setActiveTab("2");
               setPage(1);
             }}
-            className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
-              activeTab === "2"
-                ? "bg-[#0B1528] text-white shadow-xs font-bold"
-                : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
-            }`}
+            className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${activeTab === "2"
+              ? "bg-[#0B1528] text-white shadow-xs font-bold"
+              : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
+              }`}
           >
             <Star className="w-3.5 h-3.5 fill-[#FAB10B] text-[#FAB10B]" />
             2 Stars ({stats.stars_2})
@@ -303,11 +296,10 @@ export default function ReviewsPage() {
               setActiveTab("1");
               setPage(1);
             }}
-            className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
-              activeTab === "1"
-                ? "bg-[#0B1528] text-white shadow-xs font-bold"
-                : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
-            }`}
+            className={`px-4 py-2 rounded-full transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${activeTab === "1"
+              ? "bg-[#0B1528] text-white shadow-xs font-bold"
+              : "bg-white text-slate-600 hover:text-slate-900 border border-slate-200/80 hover:bg-slate-50"
+              }`}
           >
             <Star className="w-3.5 h-3.5 fill-[#FAB10B] text-[#FAB10B]" />
             1 Star ({stats.stars_1})
@@ -376,9 +368,8 @@ export default function ReviewsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Main Reviews Table */}
           <div
-            className={`transition-all duration-200 ${
-              selectedReview ? "lg:col-span-8" : "lg:col-span-12"
-            }`}
+            className={`transition-all duration-200 ${selectedReview ? "lg:col-span-8" : "lg:col-span-12"
+              }`}
           >
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
               <div className="overflow-x-auto">
@@ -418,9 +409,8 @@ export default function ReviewsPage() {
                           <tr
                             key={rev.id}
                             onClick={() => handleSelectReview(rev)}
-                            className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
-                              isSelected ? "bg-amber-50/40" : ""
-                            }`}
+                            className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${isSelected ? "bg-amber-50/40" : ""
+                              }`}
                           >
                             {/* Student: Avatar + Name */}
                             <td className="py-3 px-4">
@@ -486,11 +476,10 @@ export default function ReviewsPage() {
                               >
                                 <button
                                   onClick={() => handleSelectReview(rev)}
-                                  className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${
-                                    isSelected
-                                      ? "bg-[#0B1528] text-white border-[#0B1528]"
-                                      : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs"
-                                  }`}
+                                  className={`px-3 py-1 rounded-lg text-xs font-semibold border transition-all ${isSelected
+                                    ? "bg-[#0B1528] text-white border-[#0B1528]"
+                                    : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200 shadow-2xs"
+                                    }`}
                                 >
                                   View
                                 </button>
@@ -573,11 +562,10 @@ export default function ReviewsPage() {
                     <button
                       key={num}
                       onClick={() => setPage(num)}
-                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        page === num
-                          ? "bg-[#0B1528] text-white"
-                          : "border border-slate-200 hover:bg-slate-50 text-slate-700"
-                      }`}
+                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${page === num
+                        ? "bg-[#0B1528] text-white"
+                        : "border border-slate-200 hover:bg-slate-50 text-slate-700"
+                        }`}
                     >
                       {num}
                     </button>
@@ -587,11 +575,10 @@ export default function ReviewsPage() {
 
                   <button
                     onClick={() => setPage(18)}
-                    className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                      page === 18
-                        ? "bg-[#0B1528] text-white"
-                        : "border border-slate-200 hover:bg-slate-50 text-slate-700"
-                    }`}
+                    className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${page === 18
+                      ? "bg-[#0B1528] text-white"
+                      : "border border-slate-200 hover:bg-slate-50 text-slate-700"
+                      }`}
                   >
                     18
                   </button>

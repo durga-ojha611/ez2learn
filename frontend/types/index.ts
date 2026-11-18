@@ -14,6 +14,7 @@ export interface AdminUser {
   status: 'active' | 'inactive' | 'suspended';
   last_login_at?: string;
   permissions?: string[];
+  accessible_sections?: string[];
 }
 
 export type TransmissionType = 'automatic' | 'manual' | 'both';

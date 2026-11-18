@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PageHeading } from "@/components/common/PageHeading";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { apiFetch } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
@@ -23,6 +24,8 @@ export default function NotificationsPage() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [bookingEventsCount, setBookingEventsCount] = useState(0);
+  const [complianceCount, setComplianceCount] = useState(0);
   const [category, setCategory] = useState("all");
   const [loading, setLoading] = useState(true);
 
@@ -39,6 +42,12 @@ export default function NotificationsPage() {
       if (res.success) {
         setNotifications(res.data?.notifications || []);
         setUnreadCount(res.data?.unread_count || 0);
+        if (res.data?.booking_events_count !== undefined) {
+          setBookingEventsCount(res.data.booking_events_count);
+        }
+        if (res.data?.compliance_count !== undefined) {
+          setComplianceCount(res.data.compliance_count);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -97,29 +106,24 @@ export default function NotificationsPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 w-full select-none">
-        {/* Page Title & Action Buttons matching Reference Image */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-heading font-black text-3xl sm:text-4xl text-slate-900 tracking-tight leading-tight">
-              Notifications
-            </h1>
-            <p className="font-sans font-medium text-sm text-slate-500 mt-1">
-              Live operational alerts, booking changes and instructor licence renewals.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3 shrink-0">
-            {unreadCount > 0 && (
+      <div className="space-y-6 w-full min-w-0 select-none pb-14">
+        {/* Page Title with Full-Width Rectangle Badge Heading */}
+        <PageHeading
+          icon={Bell}
+          title="System Notifications"
+          subtitle="Live operational alerts, booking changes and instructor licence renewals"
+          badge={unreadCount > 0 ? `${unreadCount} Unread` : "All Clear"}
+          actions={
+            unreadCount > 0 ? (
               <button
                 onClick={handleMarkAllRead}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-heading font-bold text-sm shadow-2xs transition-all"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-heading font-bold text-xs sm:text-sm shadow-2xs transition-all cursor-pointer"
               >
                 <span>Mark all read ({unreadCount})</span>
               </button>
-            )}
-          </div>
-        </div>
+            ) : null
+          }
+        />
 
         {/* 4 Stat KPI Cards matching Reference Image */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -141,14 +145,14 @@ export default function NotificationsPage() {
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
             <span className="font-sans text-xs font-semibold text-slate-500">Booking events</span>
             <div className="font-heading font-black text-3xl text-slate-900 mt-1">
-              21
+              {bookingEventsCount}
             </div>
           </div>
 
           <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs">
             <span className="font-sans text-xs font-semibold text-slate-500">Compliance</span>
             <div className="font-heading font-black text-3xl text-slate-900 mt-1">
-              4
+              {complianceCount}
             </div>
           </div>
         </div>
@@ -161,11 +165,10 @@ export default function NotificationsPage() {
               <button
                 key={cat}
                 onClick={() => setCategory(cat)}
-                className={`px-5 py-1.5 rounded-full font-heading font-bold text-xs sm:text-sm capitalize transition-all whitespace-nowrap ${
-                  isSelected
-                    ? "bg-[#0B1528] text-white shadow-2xs"
-                    : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
-                }`}
+                className={`px-5 py-1.5 rounded-full font-heading font-bold text-xs sm:text-sm capitalize transition-all whitespace-nowrap ${isSelected
+                  ? "bg-[#0B1528] text-white shadow-2xs"
+                  : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                  }`}
               >
                 {cat}
               </button>
@@ -187,11 +190,10 @@ export default function NotificationsPage() {
             notifications.map((item) => (
               <div
                 key={item.id}
-                className={`card-premium p-4 flex items-start justify-between gap-4 transition-all ${
-                  item.is_read
-                    ? "bg-white opacity-85"
-                    : "bg-amber-50/20 border-brandYellow-500/40 ring-1 ring-brandYellow-500/20"
-                }`}
+                className={`card-premium p-4 flex items-start justify-between gap-4 transition-all ${item.is_read
+                  ? "bg-white opacity-85"
+                  : "bg-amber-50/20 border-brandYellow-500/40 ring-1 ring-brandYellow-500/20"
+                  }`}
               >
                 <div className="flex items-start gap-3">
                   <div className="h-9 w-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 mt-0.5">

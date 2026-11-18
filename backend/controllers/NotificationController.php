@@ -25,10 +25,14 @@ class NotificationController {
         $notifications = $stmt->fetchAll();
 
         $unreadCount = (int)$db->query("SELECT COUNT(*) FROM notifications WHERE is_read = 0")->fetchColumn();
+        $bookingEventsCount = (int)$db->query("SELECT COUNT(*) FROM notifications WHERE category = 'booking'")->fetchColumn();
+        $complianceCount = (int)$db->query("SELECT COUNT(*) FROM notifications WHERE category IN ('instructor', 'system')")->fetchColumn();
 
         Response::success([
             'notifications' => $notifications,
-            'unread_count' => $unreadCount
+            'unread_count' => $unreadCount,
+            'booking_events_count' => $bookingEventsCount,
+            'compliance_count' => $complianceCount,
         ], 'Notifications retrieved');
     }
 

@@ -2,17 +2,15 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
   Menu,
   Search,
   Bell,
   Settings,
   LogOut,
-  ChevronDown,
 } from "lucide-react";
 import { AdminUser } from "@/types";
-import { getInitials } from "@/lib/utils";
 
 interface HeaderProps {
   onToggleSidebar: () => void;
@@ -165,5 +163,3 @@ export const Header: React.FC<HeaderProps> = ({
     </header>
   );
 };
-
-

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PageHeading } from "@/components/common/PageHeading";
 import { Drawer } from "@/components/common/Drawer";
 import { Modal } from "@/components/common/Modal";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
@@ -54,236 +55,11 @@ export interface LocationItem {
   coordinates: { x: number; y: number }; // Relative percentage on SVG map
 }
 
-const INITIAL_LOCATIONS: LocationItem[] = [
-  {
-    id: 1,
-    suburb: "Parramatta",
-    state: "NSW",
-    city: "Greater Sydney",
-    service_area: "Parramatta & Surrounds",
-    postcode: "2150",
-    status: "active",
-    coverage_radius_km: 15,
-    nearby_suburbs: "Parramatta, Harris Park, Rosehill, Wentworthville",
-    assigned_instructors_count: 8,
-    assigned_instructor_names: [
-      "Kevin O'Connor",
-      "Aisha Khan",
-      "Daniel Cooper",
-      "Michael Zhang",
-      "Priya Sharma",
-      "Sam Kapoor",
-      "Lee Tran",
-      "Dan Mitchell",
-    ],
-    total_lessons: 248,
-    active_students: 36,
-    image_url:
-      "https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=700&auto=format&fit=crop&q=80",
-    coordinates: { x: 42, y: 38 },
-  },
-  {
-    id: 2,
-    suburb: "Blacktown",
-    state: "NSW",
-    city: "Greater Sydney",
-    service_area: "Blacktown & Surrounds",
-    postcode: "2148",
-    status: "active",
-    coverage_radius_km: 18,
-    nearby_suburbs: "Blacktown, Seven Hills, Marayong, Prospect",
-    assigned_instructors_count: 6,
-    assigned_instructor_names: [
-      "Kevin O'Connor",
-      "Aisha Khan",
-      "Michael Zhang",
-      "Priya Sharma",
-      "Daniel Cooper",
-      "Sam Kapoor",
-    ],
-    total_lessons: 192,
-    active_students: 28,
-    image_url:
-      "https://images.unsplash.com/photo-1518684079-3c830dcef090?w=700&auto=format&fit=crop&q=80",
-    coordinates: { x: 26, y: 34 },
-  },
-  {
-    id: 3,
-    suburb: "Liverpool",
-    state: "NSW",
-    city: "Greater Sydney",
-    service_area: "Liverpool & Surrounds",
-    postcode: "2170",
-    status: "active",
-    coverage_radius_km: 20,
-    nearby_suburbs: "Liverpool, Casula, Warwick Farm, Moorebank",
-    assigned_instructors_count: 5,
-    assigned_instructor_names: [
-      "Kevin O'Connor",
-      "Daniel Cooper",
-      "Priya Sharma",
-      "Lee Tran",
-      "Dan Mitchell",
-    ],
-    total_lessons: 164,
-    active_students: 22,
-    image_url:
-      "https://images.unsplash.com/photo-1477959858617-67f30bc75b82?w=700&auto=format&fit=crop&q=80",
-    coordinates: { x: 23, y: 58 },
-  },
-  {
-    id: 4,
-    suburb: "Chatswood",
-    state: "NSW",
-    city: "Greater Sydney",
-    service_area: "Chatswood & Surrounds",
-    postcode: "2067",
-    status: "active",
-    coverage_radius_km: 12,
-    nearby_suburbs: "Chatswood, Artarmon, Roseville, Willoughby",
-    assigned_instructors_count: 4,
-    assigned_instructor_names: [
-      "Michael Zhang",
-      "Aisha Khan",
-      "Sam Kapoor",
-      "Lee Tran",
-    ],
-    total_lessons: 140,
-    active_students: 19,
-    image_url:
-      "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=700&auto=format&fit=crop&q=80",
-    coordinates: { x: 67, y: 31 },
-  },
-  {
-    id: 5,
-    suburb: "Hornsby",
-    state: "NSW",
-    city: "Greater Sydney",
-    service_area: "Hornsby & Surrounds",
-    postcode: "2077",
-    status: "inactive",
-    coverage_radius_km: 15,
-    nearby_suburbs: "Hornsby, Asquith, Waitara, Normanhurst",
-    assigned_instructors_count: 2,
-    assigned_instructor_names: ["Michael Zhang", "Kevin O'Connor"],
-    total_lessons: 86,
-    active_students: 8,
-    image_url:
-      "https://images.unsplash.com/photo-1444723121867-7a241cacace9?w=700&auto=format&fit=crop&q=80",
-    coordinates: { x: 58, y: 16 },
-  },
-  {
-    id: 6,
-    suburb: "Penrith",
-    state: "NSW",
-    city: "Greater Sydney",
-    service_area: "Penrith & Surrounds",
-    postcode: "2750",
-    status: "active",
-    coverage_radius_km: 25,
-    nearby_suburbs: "Penrith, Kingswood, Emu Plains, South Penrith",
-    assigned_instructors_count: 5,
-    assigned_instructor_names: [
-      "Kevin O'Connor",
-      "Daniel Cooper",
-      "Dan Mitchell",
-      "Lee Tran",
-      "Priya Sharma",
-    ],
-    total_lessons: 158,
-    active_students: 24,
-    image_url:
-      "https://images.unsplash.com/photo-1513694203232-719a280e022f?w=700&auto=format&fit=crop&q=80",
-    coordinates: { x: 14, y: 38 },
-  },
-  {
-    id: 7,
-    suburb: "Bankstown",
-    state: "NSW",
-    city: "Greater Sydney",
-    service_area: "Bankstown & Surrounds",
-    postcode: "2200",
-    status: "active",
-    coverage_radius_km: 14,
-    nearby_suburbs: "Bankstown, Yagoona, Condell Park, Punchbowl",
-    assigned_instructors_count: 4,
-    assigned_instructor_names: [
-      "Aisha Khan",
-      "Priya Sharma",
-      "Sam Kapoor",
-      "Daniel Cooper",
-    ],
-    total_lessons: 118,
-    active_students: 16,
-    image_url:
-      "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=700&auto=format&fit=crop&q=80",
-    coordinates: { x: 44, y: 55 },
-  },
-  {
-    id: 8,
-    suburb: "Sutherland",
-    state: "NSW",
-    city: "Greater Sydney",
-    service_area: "Sutherland Shire & Surrounds",
-    postcode: "2232",
-    status: "active",
-    coverage_radius_km: 16,
-    nearby_suburbs: "Sutherland, Miranda, Jannali, Kirrawee",
-    assigned_instructors_count: 3,
-    assigned_instructor_names: ["Dan Mitchell", "Lee Tran", "Kevin O'Connor"],
-    total_lessons: 94,
-    active_students: 14,
-    image_url:
-      "https://images.unsplash.com/photo-1498084393753-b411b2d26b34?w=700&auto=format&fit=crop&q=80",
-    coordinates: { x: 48, y: 72 },
-  },
-  {
-    id: 9,
-    suburb: "Sydney CBD",
-    state: "NSW",
-    city: "Greater Sydney",
-    service_area: "Sydney City & Eastern Suburbs",
-    postcode: "2000",
-    status: "active",
-    coverage_radius_km: 10,
-    nearby_suburbs: "Sydney, Ultimo, Pyrmont, Surry Hills",
-    assigned_instructors_count: 5,
-    assigned_instructor_names: [
-      "Michael Zhang",
-      "Aisha Khan",
-      "Sam Kapoor",
-      "Lee Tran",
-      "Kevin O'Connor",
-    ],
-    total_lessons: 210,
-    active_students: 31,
-    image_url:
-      "https://images.unsplash.com/photo-1506973035872-a4ec16b8e8d9?w=700&auto=format&fit=crop&q=80",
-    coordinates: { x: 74, y: 44 },
-  },
-  {
-    id: 10,
-    suburb: "Melbourne CBD",
-    state: "VIC",
-    city: "Melbourne",
-    service_area: "Melbourne City & Surrounds",
-    postcode: "3000",
-    status: "active",
-    coverage_radius_km: 12,
-    nearby_suburbs: "Melbourne, Carlton, Southbank, Docklands",
-    assigned_instructors_count: 3,
-    assigned_instructor_names: ["Daniel Cooper", "Sam Kapoor", "Dan Mitchell"],
-    total_lessons: 78,
-    active_students: 12,
-    image_url:
-      "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=700&auto=format&fit=crop&q=80",
-    coordinates: { x: 50, y: 50 },
-  },
-];
+const INITIAL_LOCATIONS: LocationItem[] = [];
 
 export default function LocationsPage() {
   const [locations, setLocations] = useState<LocationItem[]>(INITIAL_LOCATIONS);
-  const [selectedLocation, setSelectedLocation] = useState<LocationItem>(INITIAL_LOCATIONS[0]);
+  const [selectedLocation, setSelectedLocation] = useState<LocationItem | null>(null);
 
   // View state: Map View or List View
   const [viewMode, setViewMode] = useState<"map" | "list">("map");
@@ -327,17 +103,8 @@ export default function LocationsPage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [locationToDelete, setLocationToDelete] = useState<LocationItem | null>(null);
 
-  // Instructor pool for allocation
-  const availableInstructors = [
-    "Kevin O'Connor",
-    "Aisha Khan",
-    "Daniel Cooper",
-    "Michael Zhang",
-    "Priya Sharma",
-    "Sam Kapoor",
-    "Dan Mitchell",
-    "Lee Tran",
-  ];
+  // Instructor pool dynamically loaded from MySQL API
+  const [availableInstructors, setAvailableInstructors] = useState<string[]>([]);
 
   useEffect(() => {
     loadLocationsFromApi();
@@ -345,7 +112,16 @@ export default function LocationsPage() {
 
   const loadLocationsFromApi = async () => {
     try {
-      const res = await apiFetch("/api/locations");
+      const [res, instRes] = await Promise.all([
+        apiFetch("/api/locations"),
+        apiFetch("/api/instructors?limit=100"),
+      ]);
+
+      if (instRes && instRes.success && Array.isArray(instRes.data)) {
+        const names: string[] = instRes.data.map((i: any) => i.name).filter(Boolean);
+        setAvailableInstructors(names);
+      }
+
       if (res && res.success && res.data && res.data.suburbs) {
         // Map backend suburbs into LocationItem
         const dbItems: LocationItem[] = res.data.suburbs.map((s: any, idx: number) => {
@@ -376,23 +152,19 @@ export default function LocationsPage() {
           };
         });
 
-        // Merge initial mockup items at top for instant visual fidelity
-        setLocations((prev) => {
-          const existingNames = new Set(INITIAL_LOCATIONS.map((l) => l.suburb.toLowerCase()));
-          const newUnique = dbItems.filter((l) => !existingNames.has(l.suburb.toLowerCase()));
-          return [...INITIAL_LOCATIONS, ...newUnique];
-        });
+        // Set real database locations directly
+        setLocations(dbItems);
       }
     } catch (err) {
       console.warn("Using offline locations dataset:", err);
     }
   };
 
-  // Top Statistics matching mockup cards: Total: 42, Active: 37, Inactive: 5, States: 2 (NSW, VIC)
-  const totalLocationsCount = 42;
-  const activeLocationsCount = 37;
-  const inactiveLocationsCount = 5;
-  const statesCoveredCount = 2;
+  // Top Statistics dynamically calculated from live locations state
+  const totalLocationsCount = locations.length;
+  const activeLocationsCount = locations.filter((l) => l.status === "active").length;
+  const inactiveLocationsCount = locations.filter((l) => l.status === "inactive").length;
+  const statesCoveredCount = new Set(locations.map((l) => l.state)).size;
 
   // Filter Locations
   const filteredLocations = locations.filter((loc) => {
@@ -458,7 +230,7 @@ export default function LocationsPage() {
       coverage_radius_km: 15,
       nearby_suburbs: "",
       status: "active",
-      assigned_instructors: ["Kevin O'Connor", "Aisha Khan"],
+      assigned_instructors: availableInstructors.slice(0, 2),
     });
     setDrawerOpen(true);
   };
@@ -522,8 +294,8 @@ export default function LocationsPage() {
         )
       );
 
-      if (selectedLocation.id === editingLocation.id) {
-        setSelectedLocation((prev) => ({
+      if (selectedLocation && selectedLocation.id === editingLocation.id) {
+        setSelectedLocation((prev) => prev ? ({
           ...prev,
           suburb: formData.suburb,
           state: formData.state,
@@ -535,7 +307,7 @@ export default function LocationsPage() {
           status: formData.status,
           assigned_instructors_count: formData.assigned_instructors.length,
           assigned_instructor_names: formData.assigned_instructors,
-        }));
+        }) : null);
       }
 
       alert(`Location ${formData.suburb} updated successfully.`);
@@ -582,8 +354,8 @@ export default function LocationsPage() {
       prev.map((item) => (item.id === loc.id ? { ...item, status: newStatus } : item))
     );
 
-    if (selectedLocation.id === loc.id) {
-      setSelectedLocation((prev) => ({ ...prev, status: newStatus }));
+    if (selectedLocation && selectedLocation.id === loc.id) {
+      setSelectedLocation((prev) => prev ? ({ ...prev, status: newStatus }) : null);
     }
 
     alert(`Location ${loc.suburb} is now ${newStatus.toUpperCase()}`);
@@ -613,12 +385,12 @@ export default function LocationsPage() {
       )
     );
 
-    if (selectedLocation.id === assignTarget.id) {
-      setSelectedLocation((prev) => ({
+    if (selectedLocation && selectedLocation.id === assignTarget.id) {
+      setSelectedLocation((prev) => prev ? ({
         ...prev,
         assigned_instructors_count: selectedInstructorNames.length,
         assigned_instructor_names: selectedInstructorNames,
-      }));
+      }) : null);
     }
 
     alert(`Assigned ${selectedInstructorNames.length} instructors to ${assignTarget.suburb}`);
@@ -642,7 +414,7 @@ export default function LocationsPage() {
     }
 
     setLocations((prev) => prev.filter((item) => item.id !== locationToDelete.id));
-    if (selectedLocation.id === locationToDelete.id) {
+    if (selectedLocation && selectedLocation.id === locationToDelete.id) {
       const remaining = locations.filter((item) => item.id !== locationToDelete.id);
       if (remaining.length > 0) setSelectedLocation(remaining[0]);
     }
@@ -654,30 +426,23 @@ export default function LocationsPage() {
 
   return (
     <AdminLayout>
-      <div className="space-y-6 w-full select-none pb-12">
-        {/* ========================================================================= */}
-        {/* 1. TOP HEADER & ADD LOCATION BUTTON (matching Reference Mockup)           */}
-        {/* ========================================================================= */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-heading font-black text-2xl sm:text-3xl text-slate-900 tracking-tight">
-              Locations
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Manage service areas and locations where you provide driving lessons.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
+      <div className="space-y-6 w-full min-w-0 select-none pb-12">
+        {/* 1. TOP HEADER with Full-Width Rectangle Badge Heading */}
+        <PageHeading
+          icon={MapPin}
+          title="Service Suburbs & Locations"
+          subtitle="Manage operational driving service areas, test centers, and postcodes"
+          badge={`${locations.length} Suburbs`}
+          actions={
             <button
               onClick={handleOpenAdd}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#0B1528] hover:bg-[#162238] text-white font-heading font-bold text-xs sm:text-sm shadow-xs transition-colors"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#0B1528] hover:bg-[#162238] text-white font-heading font-bold text-xs sm:text-sm shadow-xs transition-colors cursor-pointer"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4 text-[#FAB10B]" />
               <span>Add New Location</span>
             </button>
-          </div>
-        </div>
+          }
+        />
 
         {/* ========================================================================= */}
         {/* 2. OVERVIEW CARDS (4 KPI CARDS matching Reference Image)                  */}
@@ -859,7 +624,7 @@ export default function LocationsPage() {
                 style={{ transform: `scale(${mapZoom})`, transformOrigin: "center" }}
               >
                 {locations.slice(0, 9).map((loc) => {
-                  const isSelected = selectedLocation.id === loc.id;
+                  const isSelected = selectedLocation?.id === loc.id;
                   return (
                     <div
                       key={loc.id}
@@ -1043,7 +808,7 @@ export default function LocationsPage() {
                     </tr>
                   ) : (
                     paginatedLocations.map((loc) => {
-                      const isSelected = selectedLocation.id === loc.id;
+                      const isSelected = selectedLocation?.id === loc.id;
                       return (
                         <tr
                           key={loc.id}
@@ -1276,6 +1041,8 @@ export default function LocationsPage() {
               Location Details
             </h3>
 
+            {selectedLocation ? (
+              <>
             {/* Location Image Banner */}
             <div className="relative rounded-2xl overflow-hidden h-36 w-full border border-slate-200/70">
               <img
@@ -1376,7 +1143,7 @@ export default function LocationsPage() {
             {/* Action Buttons matching mockup */}
             <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
               <button
-                onClick={() => handleOpenEdit(selectedLocation)}
+                onClick={() => selectedLocation && handleOpenEdit(selectedLocation)}
                 className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-heading font-bold text-xs shadow-2xs transition-all"
               >
                 <Edit className="w-3.5 h-3.5 text-slate-500" />
@@ -1384,7 +1151,7 @@ export default function LocationsPage() {
               </button>
 
               <button
-                onClick={() => handleToggleStatus(selectedLocation)}
+                onClick={() => selectedLocation && handleToggleStatus(selectedLocation)}
                 className={`inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border text-xs font-heading font-bold transition-all shadow-2xs ${
                   selectedLocation.status === "active"
                     ? "border-rose-200 text-[#DC2626] hover:bg-rose-50"
@@ -1395,6 +1162,14 @@ export default function LocationsPage() {
                 <span>{selectedLocation.status === "active" ? "Deactivate" : "Activate"}</span>
               </button>
             </div>
+              </>
+            ) : (
+              <div className="py-16 text-center text-slate-400">
+                <MapPin className="w-10 h-10 mx-auto mb-2 text-slate-300" />
+                <p className="font-bold text-slate-700 text-sm">No Location Selected</p>
+                <p className="text-xs text-slate-500 mt-1">Select a location from the map or list to view details.</p>
+              </div>
+            )}
           </div>
         </div>
 
