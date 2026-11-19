@@ -28,35 +28,39 @@ export const PageHeading: React.FC<PageHeadingProps> = ({
 }) => {
   return (
     <div
-      className={`w-full rounded-2xl bg-white border border-slate-200/90 shadow-2xs p-4.5 sm:px-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 select-none ${className}`}
+      className={`w-full rounded-2xl bg-white border border-slate-200/90 shadow-xs p-5 sm:px-7 sm:py-5.5 flex flex-col sm:flex-row sm:items-center justify-between gap-5 select-none transition-all duration-200 ${className}`}
     >
-      <div className="flex items-center gap-3.5">
+      {/* Left Block: Icon + Titles & Badge */}
+      <div className="flex items-center gap-4 sm:gap-5 min-w-0">
         <div
-          className={`w-11 h-11 rounded-xl ${iconBg} ${iconColor} flex items-center justify-center shrink-0 shadow-2xs`}
+          className={`w-13 h-13 sm:w-14 sm:h-14 rounded-2xl ${iconBg} ${iconColor} flex items-center justify-center shrink-0 shadow-2xs border border-teal-100/70`}
         >
-          <Icon className="w-5 h-5 stroke-[2.2]" />
+          <Icon className="w-6 h-6 sm:w-7 sm:h-7 stroke-[2.2]" />
         </div>
-        <div>
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="font-heading font-black text-xl sm:text-2xl text-slate-900 tracking-tight leading-tight">
+
+        <div className="min-w-0 space-y-1">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+            <h1 className="font-heading font-semibold text-2xl sm:text-[26px] text-slate-900 tracking-tight leading-snug">
               {title}
             </h1>
             {badge && (
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+              <span className="inline-flex items-center px-3 py-0.5 rounded-full text-xs font-heading font-bold bg-[#EDF5FD] text-[#07345B] border border-[#D5E6F7] shadow-2xs">
                 {badge}
               </span>
             )}
           </div>
+
           {subtitle && (
-            <p className="font-sans text-xs text-slate-500 font-medium mt-0.5">
+            <p className="font-sans text-xs sm:text-sm text-slate-500 font-medium leading-relaxed">
               {subtitle}
             </p>
           )}
         </div>
       </div>
 
+      {/* Right Block: Action Buttons & Controls */}
       {(actions || children) && (
-        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+        <div className="flex items-center gap-3 shrink-0 flex-wrap self-end sm:self-center">
           {actions}
           {children}
         </div>
@@ -64,4 +68,3 @@ export const PageHeading: React.FC<PageHeadingProps> = ({
     </div>
   );
 };
-

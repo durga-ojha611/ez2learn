@@ -27,6 +27,7 @@ const ROUTE_SECTION_MAP: Array<{ prefix: string; key: string }> = [
   { prefix: "/locations", key: "locations" },
   { prefix: "/reviews", key: "reviews" },
   { prefix: "/blogs", key: "blogs" },
+  { prefix: "/cms", key: "website_content" },
   { prefix: "/website-content", key: "website_content" },
   { prefix: "/notifications", key: "notifications" },
   { prefix: "/settings", key: "settings" },

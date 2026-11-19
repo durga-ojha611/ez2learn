@@ -153,6 +153,7 @@ $router->patch('/api/reviews/{id}/feature', 'ReviewController@toggleFeatured');
 $router->delete('/api/reviews/{id}', 'ReviewController@delete');
 
 // --- Website Content CMS ---
+$router->get('/api/content/pages', 'ContentController@getPages');
 $router->get('/api/content/page/{key}', 'ContentController@getPage');
 $router->put('/api/content/page/{key}', 'ContentController@updatePage');
 $router->get('/api/content/faqs', 'ContentController@getFaqs');
@@ -179,6 +180,7 @@ $router->get('/api/inquiries', 'InquiryController@index');
 $router->get('/api/inquiries/{id}', 'InquiryController@show');
 $router->post('/api/inquiries', 'InquiryController@store');
 $router->put('/api/inquiries/{id}', 'InquiryController@update');
+$router->post('/api/inquiries/{id}/reply', 'InquiryController@reply');
 $router->delete('/api/inquiries/{id}', 'InquiryController@delete');
 
 // --- Reports & Analytics ---

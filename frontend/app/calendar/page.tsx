@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeading } from "@/components/common/PageHeading";
+import { Drawer } from "@/components/common/Drawer";
 import { Modal } from "@/components/common/Modal";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { apiFetch } from "@/lib/api";
@@ -34,16 +36,24 @@ import {
   Clock,
   CalendarCheck,
   CalendarDays,
+  ExternalLink,
 } from "lucide-react";
 
 export default function CalendarPage() {
   const [lessons, setLessons] = useState<CalendarLessonItem[]>(MOCK_CALENDAR_LESSONS);
 
+  // Helper for avatar initials
+  const getInitials = (name?: string) => {
+    if (!name) return "ST";
+    const parts = name.trim().split(" ");
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    return name.slice(0, 2).toUpperCase();
+  };
+
   // Selected Day & Selected Lesson for the Side Window Details
-  // Starts with Day 7 selected to match Reference Image
   const [selectedDay, setSelectedDay] = useState<number | null>(7);
   const [selectedLesson, setSelectedLesson] = useState<CalendarLessonItem | null>(null);
-  const [isSideWindowOpen, setIsSideWindowOpen] = useState<boolean>(true);
+  const [isSideWindowOpen, setIsSideWindowOpen] = useState<boolean>(false);
 
   // View state: Month (default) | Week | Day
   const [view, setView] = useState<"Month" | "Week" | "Day">("Month");
@@ -152,7 +162,6 @@ export default function CalendarPage() {
           if (defaultDay7) {
             setSelectedLesson(defaultDay7);
             setSelectedDay(defaultDay7.day_number);
-            setIsSideWindowOpen(true);
           }
         }
       } catch (err) {
@@ -653,21 +662,31 @@ export default function CalendarPage() {
             {/* Today Yellow Button matching reference #FAB10B */}
             <button
               onClick={handleTodayClick}
-              className="px-4 py-2 rounded-xl bg-[#FAB10B] hover:bg-[#e2a009] text-slate-950 font-bold text-xs shadow-xs transition-colors"
+              className="px-4 py-2 rounded-xl bg-[#FAB10B] hover:bg-[#e2a009] text-slate-950 font-bold text-xs shadow-xs transition-colors cursor-pointer"
             >
               Today
+            </button>
+
+            {/* Side Window Trigger Button */}
+            <button
+              onClick={() => {
+                if (!selectedLesson && lessons.length > 0) {
+                  const currentOrFirst = lessons.find((l) => l.day_number === (selectedDay || 7)) || lessons[0];
+                  setSelectedLesson(currentOrFirst);
+                }
+                setIsSideWindowOpen(true);
+              }}
+              className="px-3.5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#152544] text-white font-bold text-xs shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Open Side Window Details"
+            >
+              <CalendarCheck className="w-3.5 h-3.5 text-[#FAB10B]" />
+              <span className="hidden sm:inline">Schedule Details</span>
             </button>
           </div>
         </div>
 
-        {/* 3. Main Container: Calendar Grid + Side Window side-by-side matching Reference Image */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* Calendar Viewport (takes 8 cols when side window is open, 12 cols when closed) */}
-          <div
-            className={`${
-              isSideWindowOpen ? "lg:col-span-8" : "lg:col-span-12"
-            } w-full bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-3 sm:p-5 overflow-hidden transition-all duration-300`}
-          >
+        {/* 3. Main Container: Full-Width Calendar Grid */}
+        <div className="w-full bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-3 sm:p-5 overflow-hidden">
             {/* MONTH VIEW */}
             {view === "Month" && (
               <div>
@@ -940,273 +959,335 @@ export default function CalendarPage() {
             )}
           </div>
 
-          {/* ======================================================== */}
-          {/* 4. SIDE WINDOW ("Lesson Details") matching Reference Image */}
-          {/* Appears side-by-side with calendar, exactly matching layout */}
-          {/* ======================================================== */}
-          {isSideWindowOpen && (
-            <div className="lg:col-span-4 w-full bg-white rounded-3xl border border-slate-200/80 shadow-2xs flex flex-col overflow-hidden animate-in fade-in slide-in-from-right-3 duration-300 sticky top-5">
-              {/* Dark Navy Header #0B1528 matching user reference image */}
-              <div className="bg-[#0B1528] px-5 py-4 flex items-center justify-between text-white shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <CalendarCheck className="w-5 h-5 text-white" />
-                  <span className="text-base font-heading font-bold text-white tracking-tight">
-                    Lesson Details
+
+        {/* ======================================================== */}
+        {/* 4. SIDE WINDOW DRAWER ("Schedule Details") */}
+        {/* Slides out from right edge when clicking any schedule/date */}
+        {/* ======================================================== */}
+        <Drawer
+          isOpen={isSideWindowOpen}
+          onClose={() => setIsSideWindowOpen(false)}
+          title="Schedule Details"
+          subtitle={
+            selectedLesson
+              ? `${selectedLesson.booking_id} • ${selectedLesson.booking_date} at ${selectedLesson.start_time}`
+              : selectedDay
+              ? `${selectedDay} ${MONTH_FULL_NAMES[currentMonthIndex]} ${currentYear}`
+              : "Lesson Information"
+          }
+          size="lg"
+          icon={<CalendarClock className="w-5 h-5 text-[#FAB10B]" />}
+        >
+          {selectedLesson ? (
+            <div className="space-y-5 text-slate-800 font-sans pb-4">
+              {/* Day Sessions Switcher (if multiple lessons on this day) */}
+              {activeDayLessons.length > 1 && (
+                <div className="bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Sessions on Day {selectedDay} ({activeDayLessons.length})
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium">Click to switch</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                    {activeDayLessons.map((l) => (
+                      <button
+                        key={l.id}
+                        onClick={() => setSelectedLesson(l)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
+                          selectedLesson.id === l.id
+                            ? "bg-[#0B1528] text-white shadow-2xs"
+                            : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        {l.start_time} • {l.student_name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Status Header Card */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-blue-50/40 border border-slate-200/80 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Booking ID
+                  </span>
+                  <h3 className="font-heading font-black text-2xl text-slate-900 tracking-tight leading-tight">
+                    {selectedLesson.booking_id}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{selectedLesson.booking_date} • {selectedLesson.start_time}</span>
+                  </p>
+                </div>
+
+                <div className="text-right">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-2xs ${
+                      selectedLesson.status === "completed"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : selectedLesson.status === "cancelled"
+                        ? "bg-rose-50 text-rose-700 border-rose-200"
+                        : "bg-blue-50 text-blue-700 border-blue-200"
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        selectedLesson.status === "completed"
+                          ? "bg-emerald-500"
+                          : selectedLesson.status === "cancelled"
+                          ? "bg-rose-500"
+                          : "bg-blue-500"
+                      }`}
+                    />
+                    <span className="capitalize">{selectedLesson.status}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Student Information Card */}
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-heading font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-[#FAB10B]" />
+                    Student Profile
+                  </span>
+                  <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-100">
+                    {selectedLesson.student_licence || "Learner Licence"}
                   </span>
                 </div>
 
-                <button
-                  onClick={() => setIsSideWindowOpen(false)}
-                  className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors"
-                  title="Close side window"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-3.5">
+                  <div className="w-13 h-13 rounded-2xl bg-[#EDF5FD] text-[#07345B] font-heading font-black text-base flex items-center justify-center shrink-0 border border-blue-100 shadow-2xs">
+                    {getInitials(selectedLesson.student_name)}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-0.5 text-xs">
+                    <p className="font-heading font-black text-slate-900 text-sm truncate">
+                      {selectedLesson.student_name}
+                    </p>
+                    <a
+                      href={`mailto:${selectedLesson.student_email}`}
+                      className="text-slate-600 hover:text-[#07345B] flex items-center gap-1.5 truncate transition-colors"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{selectedLesson.student_email}</span>
+                    </a>
+                    <a
+                      href={`tel:${selectedLesson.student_phone}`}
+                      className="text-slate-600 hover:text-[#07345B] flex items-center gap-1.5 transition-colors"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{selectedLesson.student_phone}</span>
+                    </a>
+                  </div>
+                </div>
               </div>
 
-              {/* Scrollable Details Body - ALL DETAILS SHOWN TOGETHER WITHOUT TABS */}
-              <div className="p-5 space-y-4 max-h-[calc(100vh-140px)] overflow-y-auto">
-                {selectedLesson ? (
-                  <>
-                    {/* Status Badge + Booking ID + Booking Date */}
-                    <div className="border-b border-slate-100 pb-3.5">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#DCFCE7] text-[#16A34A] border border-emerald-200/80">
-                          <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                          <span className="capitalize">{selectedLesson.status}</span>
-                        </span>
+              {/* Instructor Information Card */}
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-heading font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-[#FAB10B]" />
+                    Assigned Instructor
+                  </span>
+                  <span className="text-[11px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                    {selectedLesson.instructor_code}
+                  </span>
+                </div>
 
-                        <div className="text-right">
-                          <p className="text-xs font-bold text-slate-900 leading-tight">
-                            {selectedLesson.booking_date}
-                          </p>
-                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                            Booking Date
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="mt-1">
-                        <h2 className="text-xl font-heading font-black text-slate-900 tracking-tight">
-                          {selectedLesson.booking_id}
-                        </h2>
-                        <p className="text-[11px] text-slate-400 font-semibold">
-                          Booking ID
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Section 1: Student Information */}
-                    <div className="border-b border-slate-100 pb-3.5">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2.5">
-                        <User className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Student Information</span>
-                      </div>
-
-                      <div className="flex items-start gap-3 bg-slate-50/70 p-3 rounded-2xl border border-slate-100">
-                        <img
-                          src={selectedLesson.student_avatar}
-                          alt={selectedLesson.student_name}
-                          className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0"
-                        />
-                        <div className="min-w-0 flex-1 space-y-0.5 text-xs">
-                          <p className="font-bold text-slate-900 text-sm truncate">
-                            {selectedLesson.student_name}
-                          </p>
-                          <p className="text-slate-600 flex items-center gap-1.5 truncate">
-                            <Mail className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate">{selectedLesson.student_email}</span>
-                          </p>
-                          <p className="text-slate-600 flex items-center gap-1.5">
-                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{selectedLesson.student_phone}</span>
-                          </p>
-                          <div className="pt-0.5">
-                            <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md inline-block">
-                              {selectedLesson.student_licence}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 2: Lesson Information */}
-                    <div className="border-b border-slate-100 pb-3.5">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
-                        <Car className="w-3.5 h-3.5 text-slate-700" />
-                        <span>Lesson Information</span>
-                      </div>
-
-                      <div className="space-y-1.5 text-xs">
-                        <div className="flex justify-between py-0.5">
-                          <span className="text-slate-500 font-medium">Lesson Type</span>
-                          <span className="font-bold text-slate-800">{selectedLesson.lesson_type}</span>
-                        </div>
-                        <div className="flex justify-between py-0.5">
-                          <span className="text-slate-500 font-medium">Lesson Package</span>
-                          <span className="font-bold text-slate-800">{selectedLesson.lesson_package}</span>
-                        </div>
-                        <div className="flex justify-between py-0.5">
-                          <span className="text-slate-500 font-medium">Lesson Duration</span>
-                          <span className="font-bold text-slate-800">{selectedLesson.duration_minutes} mins</span>
-                        </div>
-                        <div className="flex justify-between py-0.5">
-                          <span className="text-slate-500 font-medium">Pickup Location</span>
-                          <span className="font-semibold text-slate-800 text-right max-w-[190px] truncate">{selectedLesson.pickup_location}</span>
-                        </div>
-                        <div className="flex justify-between py-0.5">
-                          <span className="text-slate-500 font-medium">Drop-off Location</span>
-                          <span className="font-semibold text-slate-800 text-right max-w-[190px] truncate">{selectedLesson.dropoff_location}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 3: Instructor Information */}
-                    <div className="border-b border-slate-100 pb-3.5">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2.5">
-                        <User className="w-3.5 h-3.5 text-amber-500" />
-                        <span>Instructor Information</span>
-                      </div>
-
-                      <div className="flex items-start gap-3 bg-slate-50/70 p-3 rounded-2xl border border-slate-100">
-                        <img
-                          src={selectedLesson.instructor_avatar}
-                          alt={selectedLesson.instructor_name}
-                          className="w-12 h-12 rounded-full object-cover border border-slate-200 shrink-0"
-                        />
-                        <div className="min-w-0 flex-1 space-y-0.5 text-xs">
-                          <div className="flex items-center justify-between">
-                            <p className="font-bold text-slate-900 text-sm">
-                              {selectedLesson.instructor_name}
-                            </p>
-                            <span className="text-[11px] font-bold text-slate-500 font-mono">
-                              {selectedLesson.instructor_code}
-                            </span>
-                          </div>
-                          <p className="text-slate-600 flex items-center gap-1.5">
-                            <Phone className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span>{selectedLesson.instructor_phone}</span>
-                          </p>
-                          <p className="text-slate-600 flex items-center gap-1.5 pt-0.5">
-                            <Car className="w-3 h-3 text-slate-400 shrink-0" />
-                            <span className="truncate">{selectedLesson.instructor_vehicle}</span>
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 4: Payment Information */}
-                    <div className="border-b border-slate-100 pb-3.5">
-                      <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800 mb-2">
-                        <CreditCard className="w-3.5 h-3.5 text-slate-700" />
-                        <span>Payment Information</span>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50/70 p-3 rounded-2xl border border-slate-100">
-                        <div className="space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-slate-500">Total Amount</span>
-                            <span className="font-semibold text-slate-800">${Number(selectedLesson.total_amount || 0).toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-500">Discount</span>
-                            <span className="font-semibold text-slate-800">${Number(selectedLesson.discount || 0).toFixed(2)}</span>
-                          </div>
-                          <div className="flex justify-between pt-1 border-t border-slate-200 font-bold">
-                            <span className="text-slate-900">Final Amount</span>
-                            <span className="text-slate-900">${Number(selectedLesson.final_amount || 0).toFixed(2)}</span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col justify-between items-end text-right">
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#DCFCE7] text-[#16A34A] border border-emerald-200 flex items-center gap-1">
-                            <Check className="w-3 h-3 stroke-[2.5]" />
-                            <span>{selectedLesson.payment_status}</span>
-                          </span>
-                          <p className="text-[10px] text-slate-400 font-mono">
-                            {selectedLesson.transaction_id}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Section 5: Additional Information */}
-                    <div className="pb-1 text-xs">
-                      <div className="flex items-center gap-1.5 font-bold text-slate-800 mb-2">
-                        <FileText className="w-3.5 h-3.5 text-slate-700" />
-                        <span>Additional Information</span>
-                      </div>
-
-                      <div className="space-y-1 text-slate-700 bg-slate-50/60 p-3 rounded-xl border border-slate-100">
-                        <p>
-                          <strong className="text-slate-900 font-semibold">Student Notes:</strong> {selectedLesson.student_notes}
-                        </p>
-                        <p>
-                          <strong className="text-slate-900 font-semibold">Special Requirements:</strong> {selectedLesson.special_requirements}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons strictly matching reference */}
-                    <div className="pt-2 grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => setIsEditModalOpen(true)}
-                        className="px-3 py-2 rounded-xl bg-[#0B1528] hover:bg-[#152544] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
-                      >
-                        <Edit className="w-3.5 h-3.5" />
-                        <span>Edit</span>
-                      </button>
-
-                      <button
-                        onClick={() => setIsRescheduleModalOpen(true)}
-                        className="px-3 py-2 rounded-xl bg-[#0B1528] hover:bg-[#152544] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Reschedule</span>
-                      </button>
-
-                      <button
-                        onClick={() => setCancelLessonModal(selectedLesson)}
-                        className="px-3 py-2 rounded-xl bg-white hover:bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Cancel Booking</span>
-                      </button>
-
-                      <button
-                        onClick={handleMarkCompleted}
-                        className="px-3 py-2 rounded-xl bg-white hover:bg-emerald-50 border border-slate-200 text-slate-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors"
-                      >
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Mark Completed</span>
-                      </button>
-                    </div>
-                  </>
-                ) : (
-                  /* Date with No Lessons */
-                  <div className="py-12 text-center space-y-3">
-                    <CalendarDays className="w-10 h-10 text-amber-500 mx-auto" />
-                    <h3 className="text-base font-heading font-black text-slate-900">
-                      No Lessons Scheduled
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      There are no driving lessons booked on {selectedDay} {MONTH_FULL_NAMES[currentMonthIndex]} {currentYear}.
-                    </p>
-                    <button
-                      onClick={() => handleOpenCreateForDate(selectedDay || 7)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#0B1528] text-white text-xs font-bold hover:bg-[#152544]"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-[#FAB10B]" />
-                      <span>Schedule Lesson</span>
-                    </button>
+                <div className="flex items-center gap-3.5">
+                  <div className="w-13 h-13 rounded-2xl bg-amber-50 text-amber-800 font-heading font-black text-base flex items-center justify-center shrink-0 border border-amber-200 shadow-2xs">
+                    {getInitials(selectedLesson.instructor_name)}
                   </div>
-                )}
+                  <div className="min-w-0 flex-1 space-y-0.5 text-xs">
+                    <p className="font-heading font-black text-slate-900 text-sm truncate">
+                      {selectedLesson.instructor_name}
+                    </p>
+                    <a
+                      href={`tel:${selectedLesson.instructor_phone}`}
+                      className="text-slate-600 hover:text-[#07345B] flex items-center gap-1.5 transition-colors"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{selectedLesson.instructor_phone}</span>
+                    </a>
+                    <p className="text-slate-600 flex items-center gap-1.5 pt-0.5">
+                      <Car className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{selectedLesson.instructor_vehicle}</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lesson & Route Information Card */}
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2.5 text-xs">
+                <span className="text-xs font-heading font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <Car className="w-4 h-4 text-[#FAB10B]" />
+                  Lesson & Route Information
+                </span>
+
+                <div className="grid grid-cols-2 gap-2 bg-slate-50/70 p-3 rounded-xl border border-slate-100">
+                  <div>
+                    <span className="text-slate-400 font-medium block text-[11px]">Lesson Type</span>
+                    <span className="font-bold text-slate-900">{selectedLesson.lesson_type}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium block text-[11px]">Duration</span>
+                    <span className="font-bold text-slate-900">{selectedLesson.duration_minutes} Minutes</span>
+                  </div>
+                  <div className="col-span-2 pt-1 border-t border-slate-200/60">
+                    <span className="text-slate-400 font-medium block text-[11px]">Package</span>
+                    <span className="font-bold text-slate-900">{selectedLesson.lesson_package}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-start gap-2 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-400 block">Pickup Location</span>
+                      <span className="font-semibold text-slate-800">{selectedLesson.pickup_location}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 mt-1.5 shrink-0" />
+                    <div>
+                      <span className="text-[11px] font-bold text-slate-400 block">Drop-off Location</span>
+                      <span className="font-semibold text-slate-800">{selectedLesson.dropoff_location}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment Summary Card */}
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-heading font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-[#FAB10B]" />
+                    Payment Summary
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                    <Check className="w-3 h-3 stroke-[2.5]" />
+                    <span>{selectedLesson.payment_status}</span>
+                  </span>
+                </div>
+
+                <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-100 space-y-1.5 text-xs">
+                  <div className="flex justify-between text-slate-600">
+                    <span>Total Amount</span>
+                    <span className="font-semibold text-slate-900">${Number(selectedLesson.total_amount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-slate-600">
+                    <span>Discount</span>
+                    <span className="font-semibold text-slate-900">${Number(selectedLesson.discount || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-slate-200 items-center">
+                    <span className="font-heading font-bold text-slate-900 text-sm">Final Amount</span>
+                    <span className="px-3 py-1 rounded-xl bg-[#FEF9C3] text-slate-950 font-heading font-black text-base border border-amber-300">
+                      ${Number(selectedLesson.final_amount || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="pt-1 text-[11px] text-slate-400 font-mono text-right">
+                    Transaction ID: {selectedLesson.transaction_id}
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes & Special Remarks */}
+              {(selectedLesson.student_notes || selectedLesson.special_requirements) && (
+                <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2 text-xs">
+                  <span className="text-xs font-heading font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <FileText className="w-4 h-4 text-[#FAB10B]" />
+                    Notes & Remarks
+                  </span>
+                  {selectedLesson.student_notes && (
+                    <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-slate-700">
+                      <span className="font-bold text-slate-900 block mb-0.5 text-[11px]">Student Notes:</span>
+                      <p className="font-body text-slate-600">{selectedLesson.student_notes}</p>
+                    </div>
+                  )}
+                  {selectedLesson.special_requirements && selectedLesson.special_requirements !== "None" && (
+                    <div className="p-3 rounded-xl bg-amber-50/50 border border-amber-200/60 text-amber-900">
+                      <span className="font-bold text-amber-900 block mb-0.5 text-[11px]">Special Requirements:</span>
+                      <p className="font-body text-amber-800">{selectedLesson.special_requirements}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Admin Action Buttons */}
+              <div className="pt-2 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="px-4 py-2.5 rounded-xl bg-[#0B1528] hover:bg-[#152544] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <Edit className="w-3.5 h-3.5 text-[#FAB10B]" />
+                    <span>Edit Schedule</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsRescheduleModalOpen(true)}
+                    className="px-4 py-2.5 rounded-xl bg-[#0B1528] hover:bg-[#152544] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Reschedule</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleMarkCompleted}
+                    className="px-4 py-2.5 rounded-xl bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Check className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+                    <span>Mark Completed</span>
+                  </button>
+
+                  <button
+                    onClick={() => setCancelLessonModal(selectedLesson)}
+                    className="px-4 py-2.5 rounded-xl bg-white hover:bg-rose-50 border border-rose-300 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Cancel Booking</span>
+                  </button>
+                </div>
+
+                <Link
+                  href={`/bookings`}
+                  className="w-full py-2.5 px-4 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer text-center"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+                  <span>View in Official Bookings Management</span>
+                </Link>
               </div>
             </div>
+          ) : (
+            /* Date with No Lessons Scheduled */
+            <div className="py-14 text-center space-y-4 font-sans">
+              <div className="w-16 h-16 rounded-3xl bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto text-amber-500">
+                <CalendarDays className="w-8 h-8" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-heading font-black text-slate-900">
+                  No Lessons Scheduled
+                </h3>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto font-body">
+                  There are no driving lessons booked on {selectedDay} {MONTH_FULL_NAMES[currentMonthIndex]} {currentYear}.
+                </p>
+              </div>
+              <button
+                onClick={() => handleOpenCreateForDate(selectedDay || 7)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B1528] hover:bg-[#152544] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-[#FAB10B]" />
+                <span>Schedule a Lesson on this Date</span>
+              </button>
+            </div>
           )}
-        </div>
-
-        {/* ======================================================== */}
+        </Drawer>
+        
+{/* ======================================================== */}
         {/* CREATE SCHEDULE MODAL */}
         {/* ======================================================== */}
         {isCreateModalOpen && (

@@ -5,16 +5,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PageHeading } from "@/components/common/PageHeading";
+import { Drawer } from "@/components/common/Drawer";
 import { Modal } from "@/components/common/Modal";
 import { ConfirmModal } from "@/components/common/ConfirmModal";
 import { apiFetch } from "@/lib/api";
+import { formatDate } from "@/lib/utils";
 import {
   Inbox,
   Search,
   Plus,
   Mail,
   Phone,
-  MapPin,
   Calendar,
   Clock,
   CheckCircle2,
@@ -23,23 +24,31 @@ import {
   Trash2,
   ExternalLink,
   ChevronDown,
-  UserCheck,
-  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
   Filter,
   RefreshCw,
   MessageSquare,
   Sparkles,
+  Reply,
+  MoreVertical,
+  Send,
+  RotateCw,
+  Check,
+  UserCheck,
+  CalendarCheck2,
 } from "lucide-react";
 
 export interface InquiryItem {
   id: number;
   name: string;
+  subject?: string;
   email: string;
   phone: string;
   suburb: string;
   lesson_type: string;
   message: string;
-  status: "new" | "contacted" | "converted" | "closed";
+  status: "new" | "replied" | "contacted" | "converted" | "closed";
   preferred_date?: string;
   preferred_time?: string;
   notes?: string;
@@ -48,48 +57,81 @@ export interface InquiryItem {
   updated_at: string;
 }
 
+// Avatar color generator based on name
+const AVATAR_COLORS = [
+  { bg: "bg-[#2563EB]", text: "text-white" }, // Blue (like PS)
+  { bg: "bg-[#1E40AF]", text: "text-white" }, // Steel Blue (like RK)
+  { bg: "bg-[#16A34A]", text: "text-white" }, // Green (like SN)
+  { bg: "bg-[#EA580C]", text: "text-white" }, // Orange (like AM)
+  { bg: "bg-[#0F172A]", text: "text-white" }, // Navy (like DK)
+  { bg: "bg-[#7C3AED]", text: "text-white" }, // Purple
+  { bg: "bg-[#D97706]", text: "text-white" }, // Amber
+  { bg: "bg-[#0891B2]", text: "text-white" }, // Cyan
+];
+
+function getInitials(name: string): string {
+  if (!name) return "IN";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getAvatarStyle(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index];
+}
+
 export default function InquiriesPage() {
   const router = useRouter();
 
-  // State
+  // Data State
   const [inquiries, setInquiries] = useState<InquiryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    total: 0,
-    new: 0,
-    contacted: 0,
-    converted: 0,
-    closed: 0,
+    total: 24,
+    new: 12,
+    replied: 8,
+    contacted: 2,
+    converted: 1,
+    closed: 1,
   });
 
-  // Filters
+  // Filter & Search State (matching Image 1)
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [lessonTypeFilter, setLessonTypeFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("All Status");
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const itemsPerPage = 5;
+
+  // Side Window State (matching Image 2)
+  const [sideWindowOpen, setSideWindowOpen] = useState(false);
+  const [selectedInquiry, setSelectedInquiry] = useState<InquiryItem | null>(null);
+
+  // Reply Form inside Side Window
+  const [replyMode, setReplyMode] = useState(false);
+  const [replyText, setReplyText] = useState("");
+  const [sendingReply, setSendingReply] = useState(false);
+
+  // Quick Action Menu State
+  const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
 
   // Modals
-  const [selectedInquiry, setSelectedInquiry] = useState<InquiryItem | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<InquiryItem | null>(null);
   const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
-  // Notes state inside modal
-  const [modalNotes, setModalNotes] = useState("");
-  const [modalStatus, setModalStatus] = useState<"new" | "contacted" | "converted" | "closed">("new");
-  const [modalAssignedTo, setModalAssignedTo] = useState("");
-  const [savingNotes, setSavingNotes] = useState(false);
-
   // New Inquiry Form State
   const [newForm, setNewForm] = useState({
     name: "",
+    subject: "Driving Lesson Query",
     email: "",
     phone: "",
     suburb: "Parramatta",
     lesson_type: "Automatic Driving Lessons",
     message: "",
-    preferred_date: "",
-    preferred_time: "Morning 9:00 AM",
-    assigned_to: "Kevin O'Connor",
   });
   const [submittingNew, setSubmittingNew] = useState(false);
 
@@ -105,32 +147,39 @@ export default function InquiriesPage() {
   const loadInquiries = async () => {
     try {
       setLoading(true);
-      const res = await apiFetch("/api/inquiries");
+      const res = await apiFetch("/api/inquiries?limit=100");
       if (res.success && res.data) {
-        setInquiries(res.data.inquiries || []);
+        const list = res.data.inquiries || [];
+        setInquiries(list);
         if (res.data.stats) {
           setStats(res.data.stats);
         }
       }
     } catch (err) {
-      console.warn("Could not load inquiries:", err);
+      console.warn("Could not load inquiries from API", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Open modal and prepopulate
-  const handleOpenDetailModal = (inq: InquiryItem) => {
+  // Open side window for an inquiry
+  const handleOpenSideWindow = (inq: InquiryItem) => {
     setSelectedInquiry(inq);
-    setModalNotes(inq.notes || "");
-    setModalStatus(inq.status);
-    setModalAssignedTo(inq.assigned_to || "Kevin O'Connor");
+    setSideWindowOpen(true);
+    setReplyMode(false);
+    setReplyText("");
+    setActiveMenuId(null);
   };
 
-  // Quick Status change from table
+  const handleCloseSideWindow = () => {
+    setSideWindowOpen(false);
+    setReplyMode(false);
+  };
+
+  // Quick Status change
   const handleQuickStatusChange = async (
     id: number,
-    newStatus: "new" | "contacted" | "converted" | "closed"
+    newStatus: "new" | "replied" | "contacted" | "converted" | "closed"
   ) => {
     try {
       await apiFetch(`/api/inquiries/${id}`, {
@@ -140,6 +189,9 @@ export default function InquiriesPage() {
       setInquiries((prev) =>
         prev.map((item) => (item.id === id ? { ...item, status: newStatus } : item))
       );
+      if (selectedInquiry && selectedInquiry.id === id) {
+        setSelectedInquiry((prev) => (prev ? { ...prev, status: newStatus } : null));
+      }
       showToast(`Inquiry status updated to ${newStatus}`);
       loadInquiries();
     } catch (err: any) {
@@ -147,38 +199,33 @@ export default function InquiriesPage() {
     }
   };
 
-  // Save changes inside modal
-  const handleSaveModalDetails = async () => {
-    if (!selectedInquiry) return;
+  // Send Reply from side window
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInquiry || !replyText.trim()) return;
+    setSendingReply(true);
     try {
-      setSavingNotes(true);
-      await apiFetch(`/api/inquiries/${selectedInquiry.id}`, {
-        method: "PUT",
-        body: JSON.stringify({
-          status: modalStatus,
-          notes: modalNotes,
-          assigned_to: modalAssignedTo,
-        }),
+      const res = await apiFetch(`/api/inquiries/${selectedInquiry.id}/reply`, {
+        method: "POST",
+        body: JSON.stringify({ reply_message: replyText }),
       });
-      setInquiries((prev) =>
-        prev.map((item) =>
-          item.id === selectedInquiry.id
-            ? {
-                ...item,
-                status: modalStatus,
-                notes: modalNotes,
-                assigned_to: modalAssignedTo,
-              }
-            : item
-        )
-      );
-      showToast("Inquiry details saved successfully");
-      setSelectedInquiry(null);
-      loadInquiries();
+      if (res.success) {
+        showToast(`Reply sent to ${selectedInquiry.name} (${selectedInquiry.email})!`);
+        setReplyMode(false);
+        setReplyText("");
+        loadInquiries();
+        if (selectedInquiry) {
+          setSelectedInquiry({
+            ...selectedInquiry,
+            status: "replied",
+            notes: (selectedInquiry.notes ? selectedInquiry.notes + "\n\n" : "") + `[Replied]: ${replyText}`,
+          });
+        }
+      }
     } catch (err: any) {
-      showToast(err.message || "Failed to update inquiry", "error");
+      showToast(err.message || "Failed to send reply", "error");
     } finally {
-      setSavingNotes(false);
+      setSendingReply(false);
     }
   };
 
@@ -188,6 +235,9 @@ export default function InquiriesPage() {
     try {
       await apiFetch(`/api/inquiries/${deleteTarget.id}`, { method: "DELETE" });
       setInquiries((prev) => prev.filter((i) => i.id !== deleteTarget.id));
+      if (selectedInquiry?.id === deleteTarget.id) {
+        setSideWindowOpen(false);
+      }
       showToast("Inquiry deleted successfully");
       setDeleteTarget(null);
       loadInquiries();
@@ -200,7 +250,7 @@ export default function InquiriesPage() {
   const handleCreateNewInquiry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newForm.name.trim() || !newForm.email.trim() || !newForm.phone.trim()) {
-      showToast("Please fill in student name, email, and phone.", "error");
+      showToast("Please fill in customer name, email, and phone.", "error");
       return;
     }
 
@@ -215,14 +265,12 @@ export default function InquiriesPage() {
         setIsAddModalOpen(false);
         setNewForm({
           name: "",
+          subject: "Driving Lesson Query",
           email: "",
           phone: "",
           suburb: "Parramatta",
           lesson_type: "Automatic Driving Lessons",
           message: "",
-          preferred_date: "",
-          preferred_time: "Morning 9:00 AM",
-          assigned_to: "Kevin O'Connor",
         });
         loadInquiries();
       }
@@ -241,688 +289,717 @@ export default function InquiriesPage() {
         !q ||
         inq.name.toLowerCase().includes(q) ||
         inq.email.toLowerCase().includes(q) ||
+        (inq.subject && inq.subject.toLowerCase().includes(q)) ||
         inq.phone.toLowerCase().includes(q) ||
-        inq.suburb.toLowerCase().includes(q) ||
         (inq.message && inq.message.toLowerCase().includes(q));
 
-      const matchesStatus = statusFilter === "all" || inq.status === statusFilter;
-      const matchesLessonType =
-        lessonTypeFilter === "all" || inq.lesson_type === lessonTypeFilter;
+      const normFilter = statusFilter.toLowerCase();
+      const matchesStatus =
+        normFilter === "all status" || inq.status.toLowerCase() === normFilter;
 
-      return matchesSearch && matchesStatus && matchesLessonType;
+      return matchesSearch && matchesStatus;
     });
-  }, [inquiries, searchQuery, statusFilter, lessonTypeFilter]);
+  }, [inquiries, searchQuery, statusFilter]);
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "Just now";
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString("en-AU", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
+  // Pagination Slice
+  const totalItems = filteredInquiries.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const paginatedInquiries = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredInquiries.slice(start, start + itemsPerPage);
+  }, [filteredInquiries, currentPage, itemsPerPage]);
+
+  const startIndex = totalItems === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
+  const endIndex = Math.min(currentPage * itemsPerPage, totalItems);
 
   return (
     <AdminLayout>
       <div className="space-y-6 w-full min-w-0 pb-24 select-none">
-        {/* TOP HEADER: Full-Width Rectangle Badge Heading */}
+        {/* Toast Notification */}
+        {toast && (
+          <div
+            className={`fixed top-5 right-5 z-50 px-4 py-3 rounded-2xl shadow-lg border flex items-center gap-3 text-xs sm:text-sm font-semibold transition-all ${
+              toast.type === "success"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                : "bg-rose-50 border-rose-200 text-rose-800"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{toast.msg}</span>
+          </div>
+        )}
+
+        {/* TOP HEADER: Full-Width Unified Rectangle Block */}
         <PageHeading
           icon={Inbox}
           title="Inquiries & Student Leads"
           subtitle="Manage incoming driving lesson inquiries, quotes, and website leads"
-          badge={`${stats.total || inquiries.length} Leads`}
+          badge={`${stats.total || inquiries.length} Inquiries`}
           actions={
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={loadInquiries}
-                className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
-                title="Refresh leads list"
+                className="w-11 h-11 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-colors shadow-2xs cursor-pointer"
+                title="Refresh inquiries"
               >
                 <RefreshCw className="w-4 h-4" />
               </button>
 
-              <Link
-                href="/inquiries/create"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-bold text-xs shadow-xs transition-colors cursor-pointer group"
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-heading font-black text-xs sm:text-sm shadow-xs transition-colors cursor-pointer group"
               >
                 <Plus className="w-4 h-4 text-[#FAB10B] transition-transform group-hover:scale-110" />
                 <span>+ Log New Inquiry</span>
-              </Link>
+              </button>
             </div>
           }
         />
 
-        {/* 4 OVERVIEW KPI STAT CARDS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {/* Card 1: Total Leads */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-[#0B1528] flex items-center justify-center shrink-0 text-white shadow-2xs">
-              <Inbox className="w-5 h-5 text-[#FAB10B]" />
-            </div>
-            <div>
-              <div className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
-                {stats.total || inquiries.length}
-              </div>
-              <div className="text-xs font-medium text-slate-500 mt-0.5">
-                Total Inquiries
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: New / Action Required */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0 text-white shadow-2xs relative">
-              <Sparkles className="w-5 h-5 text-white" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full animate-ping" />
-            </div>
-            <div>
-              <div className="text-xl sm:text-2xl font-black text-emerald-700 leading-tight">
-                {stats.new}
-              </div>
-              <div className="text-xs font-bold text-emerald-600 mt-0.5">
-                New (Awaiting Reply)
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Contacted */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-blue-500 flex items-center justify-center shrink-0 text-white shadow-2xs">
-              <Phone className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="text-xl sm:text-2xl font-black text-blue-700 leading-tight">
-                {stats.contacted}
-              </div>
-              <div className="text-xs font-medium text-slate-500 mt-0.5">
-                Contacted / Follow-up
-              </div>
-            </div>
-          </div>
-
-          {/* Card 4: Converted to Bookings */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-xl bg-purple-600 flex items-center justify-center shrink-0 text-white shadow-2xs">
-              <CheckCircle2 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="text-xl sm:text-2xl font-black text-purple-700 leading-tight">
-                {stats.converted}
-              </div>
-              <div className="text-xs font-medium text-slate-500 mt-0.5">
-                Converted to Bookings
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* SEARCH & FILTERS CARD */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs space-y-4">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* ================= EXACT UI: MAIN INQUIRY CARD ================= */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-5">
+          {/* Top Controls Bar matching Image 1 */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5">
             {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <div className="relative w-full sm:w-96">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by student name, email, phone, suburb, or message text..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15 focus:border-[#0B1528] transition-all"
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Search by name or email..."
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#07345B]/15"
               />
             </div>
 
-            {/* Status Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-              {[
-                { id: "all", label: "All Leads", count: stats.total },
-                { id: "new", label: "New", count: stats.new },
-                { id: "contacted", label: "Contacted", count: stats.contacted },
-                { id: "converted", label: "Converted", count: stats.converted },
-                { id: "closed", label: "Closed", count: stats.closed },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                    statusFilter === tab.id
-                      ? "bg-[#0B1528] text-white shadow-2xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+            {/* Right: Dropdown + Filter Button */}
+            <div className="flex items-center gap-3 self-end sm:self-auto">
+              {/* Status Dropdown */}
+              <div className="relative">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="appearance-none pl-4 pr-10 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#07345B]/15 shadow-2xs"
                 >
-                  <span>{tab.label}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                      statusFilter === tab.id ? "bg-white/20 text-white" : "bg-white text-slate-600"
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                </button>
-              ))}
+                  <option value="All Status">All Status</option>
+                  <option value="new">New</option>
+                  <option value="replied">Replied</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="converted">Converted</option>
+                  <option value="closed">Closed</option>
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-500 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              </div>
+
+              {/* Filter Button (Yellow/Gold matching Image 1) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusFilter("All Status");
+                  setSearchQuery("");
+                  setCurrentPage(1);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-[#FAB10B] hover:bg-[#e2a009] text-slate-950 font-heading font-black text-xs sm:text-sm shadow-xs flex items-center gap-2 cursor-pointer transition-colors"
+              >
+                <Filter className="w-4 h-4 stroke-[2.5]" />
+                <span>Filter</span>
+              </button>
             </div>
           </div>
-        </div>
 
-        {/* INQUIRIES MANAGEMENT TABLE */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
-          <div className="p-5 sm:px-6 flex items-center justify-between border-b border-slate-100">
-            <h2 className="font-heading font-bold text-base sm:text-lg text-slate-900">
-              Customer Inquiries Table
-            </h2>
-            <span className="text-xs text-slate-500 font-medium">
-              Showing {filteredInquiries.length} of {inquiries.length} inquiries
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+          {/* Table matching Image 1 */}
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full text-left text-sm border-collapse">
               <thead>
-                <tr className="bg-slate-50/60 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                  <th className="py-4 px-6">STUDENT LEAD</th>
-                  <th className="py-4 px-5">CONTACT INFO</th>
-                  <th className="py-4 px-5">LESSON INTEREST</th>
-                  <th className="py-4 px-5 w-1/4">MESSAGE</th>
-                  <th className="py-4 px-5">STATUS</th>
-                  <th className="py-4 px-5">RECEIVED</th>
-                  <th className="py-4 px-6 text-right">ACTIONS</th>
+                <tr className="border-b border-slate-200/80 bg-slate-50/60 font-heading font-black text-xs text-slate-700 tracking-wider">
+                  <th className="py-3.5 px-5">Customer</th>
+                  <th className="py-3.5 px-5">Subject</th>
+                  <th className="py-3.5 px-5">Date</th>
+                  <th className="py-3.5 px-5">Status</th>
+                  <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-sans text-xs">
-                {loading ? (
+              <tbody className="divide-y divide-slate-100">
+                {paginatedInquiries.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
-                      Loading inquiries from database...
-                    </td>
-                  </tr>
-                ) : filteredInquiries.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400 font-medium">
-                      No customer inquiries found matching your filters.
+                    <td colSpan={5} className="py-12 text-center text-slate-400">
+                      No customer inquiries match your filter.
                     </td>
                   </tr>
                 ) : (
-                  filteredInquiries.map((inq) => (
-                    <tr key={inq.id} className="hover:bg-slate-50/60 transition-colors group">
-                      {/* STUDENT LEAD */}
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-[#07345B]/10 text-[#07345B] font-bold flex items-center justify-center shrink-0 text-xs">
-                            {inq.name.charAt(0)}
-                          </div>
-                          <div>
-                            <span
-                              onClick={() => handleOpenDetailModal(inq)}
-                              className="font-bold text-slate-900 hover:text-[#07345B] cursor-pointer block text-sm leading-tight"
+                  paginatedInquiries.map((inq) => {
+                    const avatarStyle = getAvatarStyle(inq.name);
+                    const initials = getInitials(inq.name);
+                    const formattedDate = inq.created_at
+                      ? formatDate(inq.created_at)
+                      : "16 Nov 2025";
+                    const isNew = inq.status === "new";
+                    const isReplied = inq.status === "replied";
+
+                    return (
+                      <tr
+                        key={inq.id}
+                        onClick={() => handleOpenSideWindow(inq)}
+                        className="hover:bg-slate-50/70 transition-colors cursor-pointer group"
+                      >
+                        {/* Customer */}
+                        <td className="py-4 px-5">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={`w-9 h-9 rounded-full ${avatarStyle.bg} ${avatarStyle.text} font-heading font-black text-xs flex items-center justify-center shrink-0 shadow-2xs`}
                             >
+                              {initials}
+                            </div>
+                            <span className="font-heading font-bold text-sm text-slate-900 group-hover:text-[#07345B] transition-colors">
                               {inq.name}
                             </span>
-                            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 font-medium mt-0.5">
-                              <MapPin className="w-3 h-3 text-slate-400" />
-                              <span>{inq.suburb}</span>
+                          </div>
+                        </td>
+
+                        {/* Subject */}
+                        <td className="py-4 px-5 text-slate-800 font-medium text-sm">
+                          {inq.subject || inq.lesson_type || "Driving Lesson Query"}
+                        </td>
+
+                        {/* Date */}
+                        <td className="py-4 px-5 text-slate-600 text-sm whitespace-nowrap">
+                          {formattedDate}
+                        </td>
+
+                        {/* Status Badge with Dot */}
+                        <td className="py-4 px-5 whitespace-nowrap">
+                          {isNew ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#EDF5FD] text-[#1D4ED8] border border-[#BFDBFE]">
+                              <span className="w-2 h-2 rounded-full bg-[#1D4ED8]"></span>
+                              New
                             </span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* CONTACT INFO */}
-                      <td className="py-4 px-5 whitespace-nowrap">
-                        <div className="space-y-1">
-                          <a
-                            href={`mailto:${inq.email}`}
-                            className="inline-flex items-center gap-1.5 text-slate-700 hover:text-[#0B1528] font-medium transition-colors"
-                          >
-                            <Mail className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{inq.email}</span>
-                          </a>
-                          <div className="flex items-center gap-1.5 text-slate-600 font-mono text-[11px]">
-                            <Phone className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{inq.phone}</span>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* LESSON INTEREST */}
-                      <td className="py-4 px-5">
-                        <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#07345B]/10 text-[#07345B] border border-[#07345B]/15 whitespace-nowrap">
-                          {inq.lesson_type}
-                        </span>
-                        {inq.preferred_time && (
-                          <div className="text-[10px] text-slate-400 font-medium mt-1 flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            <span>{inq.preferred_time}</span>
-                          </div>
-                        )}
-                      </td>
-
-                      {/* MESSAGE */}
-                      <td className="py-4 px-5 min-w-[280px] max-w-md">
-                        <Link
-                          href={`/inquiries/${inq.id}`}
-                          className="block p-2.5 rounded-xl bg-slate-50/80 hover:bg-slate-100 border border-slate-100 text-slate-700 hover:text-slate-900 transition-colors cursor-pointer group"
-                          title="Click to view full inquiry details"
-                        >
-                          <p className="text-xs font-normal leading-relaxed line-clamp-3">
-                            "{inq.message || "No message provided."}"
-                          </p>
-                          {inq.notes && (
-                            <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 text-[11px] text-slate-500 font-medium flex items-center gap-1">
-                              <span className="font-bold text-slate-700">Staff Note:</span>
-                              <span className="truncate">{inq.notes}</span>
-                            </div>
+                          ) : isReplied ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#E8F8EE] text-[#0E8A38] border border-[#B6EAC4]">
+                              <span className="w-2 h-2 rounded-full bg-[#0E8A38]"></span>
+                              Replied
+                            </span>
+                          ) : inq.status === "contacted" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#FEF9C3] text-[#854D0E] border border-[#FEF08A]">
+                              <span className="w-2 h-2 rounded-full bg-[#854D0E]"></span>
+                              Contacted
+                            </span>
+                          ) : inq.status === "converted" ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#F3E8FF] text-[#6B21A8] border border-[#E9D5FF]">
+                              <span className="w-2 h-2 rounded-full bg-[#6B21A8]"></span>
+                              Converted
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                              Closed
+                            </span>
                           )}
-                        </Link>
-                      </td>
+                        </td>
 
-                      {/* STATUS */}
-                      <td className="py-4 px-5 whitespace-nowrap">
-                        <div className="relative inline-block">
-                          <select
-                            value={inq.status}
-                            onChange={(e) =>
-                              handleQuickStatusChange(
-                                inq.id,
-                                e.target.value as "new" | "contacted" | "converted" | "closed"
-                              )
-                            }
-                            className={`appearance-none pl-3 pr-7 py-1 rounded-full text-xs font-bold border cursor-pointer focus:outline-none ${
-                              inq.status === "new"
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                : inq.status === "contacted"
-                                ? "bg-blue-50 text-blue-700 border-blue-200"
-                                : inq.status === "converted"
-                                ? "bg-purple-50 text-purple-700 border-purple-200"
-                                : "bg-slate-100 text-slate-600 border-slate-200"
-                            }`}
+                        {/* Actions: View + 3 dots */}
+                        <td className="py-4 px-5 text-right whitespace-nowrap">
+                          <div
+                            className="inline-flex items-center gap-2"
+                            onClick={(e) => e.stopPropagation()}
                           >
-                            <option value="new">New</option>
-                            <option value="contacted">Contacted</option>
-                            <option value="converted">Converted</option>
-                            <option value="closed">Closed</option>
-                          </select>
-                          <ChevronDown className="w-3 h-3 text-slate-500 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
-                        </div>
-                      </td>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenSideWindow(inq)}
+                              className="px-3.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-heading font-bold text-xs shadow-2xs transition-colors cursor-pointer"
+                            >
+                              View
+                            </button>
 
-                      {/* RECEIVED */}
-                      <td className="py-4 px-5 whitespace-nowrap text-slate-500 font-medium">
-                        {formatDate(inq.created_at)}
-                      </td>
+                            {/* Dropdown 3 dots */}
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setActiveMenuId(activeMenuId === inq.id ? null : inq.id)
+                                }
+                                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </button>
 
-                      {/* ACTIONS */}
-                      <td className="py-4 px-6 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center gap-2">
-                          <Link
-                            href={`/inquiries/${inq.id}`}
-                            className="bg-slate-100 hover:bg-[#0B1528] hover:text-white text-slate-700 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all inline-block cursor-pointer"
-                          >
-                            View & Notes
-                          </Link>
+                              {activeMenuId === inq.id && (
+                                <div className="absolute right-0 top-8 z-30 w-48 rounded-xl bg-white border border-slate-200 shadow-lg py-1.5 text-xs font-semibold text-slate-700 animate-fade-in">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleOpenSideWindow(inq);
+                                      setReplyMode(true);
+                                    }}
+                                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Reply className="w-3.5 h-3.5 text-blue-600" />
+                                    <span>Reply to Inquiry</span>
+                                  </button>
 
-                          <Link
-                            href={`/bookings/create?student_name=${encodeURIComponent(
-                              inq.name
-                            )}&email=${encodeURIComponent(inq.email)}&phone=${encodeURIComponent(
-                              inq.phone
-                            )}&suburb=${encodeURIComponent(inq.suburb)}&service=${encodeURIComponent(
-                              inq.lesson_type
-                            )}`}
-                            className="bg-emerald-50 hover:bg-emerald-600 hover:text-white text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                            title="Convert to official driving booking"
-                          >
-                            Book →
-                          </Link>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleQuickStatusChange(
+                                        inq.id,
+                                        inq.status === "replied" ? "new" : "replied"
+                                      );
+                                      setActiveMenuId(null);
+                                    }}
+                                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                    <span>
+                                      Mark as {inq.status === "replied" ? "New" : "Replied"}
+                                    </span>
+                                  </button>
 
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(inq)}
-                            className="text-rose-500 hover:text-rose-700 font-bold text-xs hover:underline transition-colors cursor-pointer ml-1"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                                  <Link
+                                    href={`/bookings/create?student_name=${encodeURIComponent(
+                                      inq.name
+                                    )}&student_email=${encodeURIComponent(
+                                      inq.email
+                                    )}&student_phone=${encodeURIComponent(inq.phone)}`}
+                                    className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex items-center gap-2 text-[#07345B] cursor-pointer"
+                                  >
+                                    <CalendarCheck2 className="w-3.5 h-3.5 text-[#07345B]" />
+                                    <span>Convert to Booking</span>
+                                  </Link>
+
+                                  <div className="border-t border-slate-100 my-1"></div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDeleteTarget(inq);
+                                      setActiveMenuId(null);
+                                    }}
+                                    className="w-full text-left px-3.5 py-2 hover:bg-rose-50 text-rose-600 flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span>Delete Inquiry</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Footer matching Image 1 */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+            <span className="text-xs sm:text-sm font-medium text-slate-500">
+              Showing {startIndex} to {endIndex} of {totalItems} inquiries
+            </span>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center gap-1.5">
+              {/* Prev < */}
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex items-center justify-center text-xs font-bold disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {/* Page numbers: 1 to totalPages */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => {
+                const isActive = pageNumber === currentPage;
+                return (
+                  <button
+                    key={pageNumber}
+                    type="button"
+                    onClick={() => setCurrentPage(pageNumber)}
+                    className={`w-8 h-8 rounded-lg text-xs font-bold flex items-center justify-center transition-colors cursor-pointer ${
+                      isActive
+                        ? "bg-[#0B1528] text-white shadow-2xs"
+                        : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              })}
+
+              {/* Next > */}
+              <button
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 flex items-center justify-center text-xs font-bold disabled:opacity-40 cursor-pointer"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* INQUIRY DETAIL & REPLY MODAL */}
-        {selectedInquiry && (
-          <Modal
-            isOpen={!!selectedInquiry}
-            onClose={() => setSelectedInquiry(null)}
-            title="Inquiry Details & Student Follow-Up"
-            maxWidth="3xl"
-          >
-            <div className="space-y-6 p-1 text-slate-800">
-              {/* Header Profile Info */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-[#0B1528] text-white flex items-center justify-center font-black text-lg">
-                    {selectedInquiry.name.charAt(0)}
+        {/* ================= EXACT UI: SIDE WINDOW DRAWER (Image 2) ================= */}
+        <Drawer
+          isOpen={sideWindowOpen}
+          onClose={handleCloseSideWindow}
+          title="Inquiry Details"
+          size="md"
+          icon={<Mail className="w-5 h-5 text-[#07345B]" />}
+        >
+          {selectedInquiry && (
+            <div className="space-y-6 text-slate-800">
+              {/* Customer Profile Section matching Image 2 */}
+              <div className="flex items-center gap-4 pb-2">
+                <div className="w-16 h-16 rounded-full bg-[#DBEAFE] text-[#1E40AF] font-heading font-black text-xl flex items-center justify-center shrink-0 border border-blue-200 shadow-2xs">
+                  {getInitials(selectedInquiry.name)}
+                </div>
+
+                <div className="min-w-0 space-y-1">
+                  <h3 className="font-heading font-black text-xl text-slate-900 leading-tight">
+                    {selectedInquiry.name}
+                  </h3>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <a
+                      href={`mailto:${selectedInquiry.email}`}
+                      className="hover:underline hover:text-blue-600 truncate"
+                    >
+                      {selectedInquiry.email}
+                    </a>
                   </div>
-                  <div>
-                    <h3 className="font-heading font-black text-lg text-slate-900">
-                      {selectedInquiry.name}
-                    </h3>
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-0.5">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                        <strong>{selectedInquiry.suburb}</strong>
-                      </span>
-                      <span>•</span>
-                      <span>Received on {formatDate(selectedInquiry.created_at)}</span>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                    <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <a
+                      href={`tel:${selectedInquiry.phone}`}
+                      className="hover:underline hover:text-slate-900"
+                    >
+                      {selectedInquiry.phone}
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-px bg-slate-100"></div>
+
+              {/* Information Items Stack matching Image 2 */}
+              <div className="space-y-4">
+                {/* 1. Subject */}
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-heading font-black text-slate-900 uppercase tracking-wider">
+                    <MessageSquare className="w-4 h-4 text-slate-600" />
+                    <span>Subject</span>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800 mt-1 pl-6">
+                    {selectedInquiry.subject || selectedInquiry.lesson_type || "Driving Lesson Query"}
+                  </p>
+                </div>
+
+                {/* 2. Date */}
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-heading font-black text-slate-900 uppercase tracking-wider">
+                    <Calendar className="w-4 h-4 text-slate-600" />
+                    <span>Date</span>
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800 mt-1 pl-6">
+                    {formatDate(selectedInquiry.created_at)} • 10:24 AM
+                  </p>
+                </div>
+
+                {/* 3. Message Bubble */}
+                <div>
+                  <div className="flex items-center gap-2 text-xs font-heading font-black text-slate-900 uppercase tracking-wider">
+                    <MessageSquare className="w-4 h-4 text-slate-600" />
+                    <span>Message</span>
+                  </div>
+                  <div className="bg-[#F0F4F8] rounded-2xl p-4 border border-slate-200/80 text-slate-800 text-sm leading-relaxed mt-2">
+                    {selectedInquiry.message || "Can you please share details about your beginner packages?"}
+                  </div>
+                </div>
+
+                {/* 4. Status with Quick Status Switcher */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-heading font-black text-slate-900 uppercase tracking-wider">
+                      <RotateCw className="w-4 h-4 text-slate-600" />
+                      <span>Status</span>
                     </div>
+
+                    {/* Quick status dropdown */}
+                    <select
+                      value={selectedInquiry.status}
+                      onChange={(e) =>
+                        handleQuickStatusChange(selectedInquiry.id, e.target.value as any)
+                      }
+                      className="text-xs font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none cursor-pointer"
+                    >
+                      <option value="new">Mark as New</option>
+                      <option value="replied">Mark as Replied</option>
+                      <option value="contacted">Mark as Contacted</option>
+                      <option value="converted">Mark as Converted</option>
+                      <option value="closed">Mark as Closed</option>
+                    </select>
+                  </div>
+
+                  <div className="mt-2 pl-6">
+                    {selectedInquiry.status === "new" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#EDF5FD] text-[#1D4ED8] border border-[#BFDBFE]">
+                        <span className="w-2 h-2 rounded-full bg-[#1D4ED8]"></span>
+                        New
+                      </span>
+                    ) : selectedInquiry.status === "replied" ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#E8F8EE] text-[#0E8A38] border border-[#B6EAC4]">
+                        <span className="w-2 h-2 rounded-full bg-[#0E8A38]"></span>
+                        Replied
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200 capitalize">
+                        <span className="w-2 h-2 rounded-full bg-slate-500"></span>
+                        {selectedInquiry.status}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <a
-                    href={`tel:${selectedInquiry.phone}`}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-800 hover:bg-slate-100 font-bold text-xs"
+                {/* Reply Composer Section */}
+                {replyMode && (
+                  <form
+                    onSubmit={handleSendReply}
+                    className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 animate-fade-in"
                   >
-                    <Phone className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Call Student</span>
-                  </a>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-heading font-black text-slate-900 uppercase tracking-wider">
+                        Compose Reply to {selectedInquiry.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setReplyMode(false)}
+                        className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
 
-                  <a
-                    href={`mailto:${selectedInquiry.email}`}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0B1528] text-white hover:bg-[#07345B] font-bold text-xs"
-                  >
-                    <Mail className="w-3.5 h-3.5 text-[#FAB10B]" />
-                    <span>Send Email</span>
-                  </a>
-                </div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[11px] font-bold text-slate-400">Quick templates:</span>
+                      {[
+                        "Packages Details",
+                        "Booking Slots",
+                        "Pricing Schedule",
+                      ].map((tmpl) => (
+                        <button
+                          key={tmpl}
+                          type="button"
+                          onClick={() =>
+                            setReplyText(
+                              `Hi ${selectedInquiry.name}, thank you for reaching out regarding ${selectedInquiry.subject || "our driving packages"}. We would love to help you get started with our RMS accredited instructors.`
+                            )
+                          }
+                          className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[11px] text-slate-600 hover:bg-slate-100"
+                        >
+                          {tmpl}
+                        </button>
+                      ))}
+                    </div>
+
+                    <textarea
+                      rows={4}
+                      required
+                      value={replyText}
+                      onChange={(e) => setReplyText(e.target.value)}
+                      placeholder="Type your official reply here... (will be logged and sent to customer)"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#07345B]/15"
+                    />
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="submit"
+                        disabled={sendingReply}
+                        className="px-5 py-2 rounded-xl bg-[#07345B] hover:bg-[#052642] text-white font-heading font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>{sendingReply ? "Sending..." : "Send Reply"}</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {/* Previous Notes/Replies */}
+                {selectedInquiry.notes && !replyMode && (
+                  <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 whitespace-pre-wrap">
+                    <span className="font-bold text-slate-700 block mb-1">
+                      Internal Activity & Reply Log:
+                    </span>
+                    {selectedInquiry.notes}
+                  </div>
+                )}
               </div>
 
-              {/* Inquiry Message Box */}
-              <div className="space-y-2">
-                <span className="font-bold text-xs text-slate-700 block">
-                  Customer Message / Request:
-                </span>
-                <div className="p-4 rounded-2xl bg-white border border-slate-200 text-xs text-slate-800 leading-relaxed font-normal whitespace-pre-wrap">
-                  {selectedInquiry.message || "No message content entered."}
-                </div>
-              </div>
+              {/* Bottom Actions matching Image 2 */}
+              <div className="space-y-2.5 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setReplyMode(!replyMode)}
+                  className="w-full py-3 px-4 rounded-xl bg-[#07345B] hover:bg-[#052642] text-white font-heading font-bold text-sm flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                >
+                  <Reply className="w-4 h-4" />
+                  <span>Reply to Inquiry</span>
+                </button>
 
-              {/* Service & Preferred Times */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="block text-slate-500 font-medium mb-1">
-                    Requested Service Type
-                  </span>
-                  <span className="font-bold text-slate-900 text-sm">
-                    {selectedInquiry.lesson_type}
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                  <span className="block text-slate-500 font-medium mb-1">
-                    Preferred Time & Availability
-                  </span>
-                  <span className="font-bold text-slate-900 text-sm">
-                    {selectedInquiry.preferred_time || "Flexible"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Status & Instructor Assignment */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2 border-t border-slate-100">
-                <div>
-                  <label className="block font-bold text-slate-800 mb-1.5">
-                    Lead Status
-                  </label>
-                  <select
-                    value={modalStatus}
-                    onChange={(e) =>
-                      setModalStatus(e.target.value as "new" | "contacted" | "converted" | "closed")
-                    }
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15"
-                  >
-                    <option value="new">New (Needs Response)</option>
-                    <option value="contacted">Contacted (In Progress)</option>
-                    <option value="converted">Converted to Booking</option>
-                    <option value="closed">Closed / Archived</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-800 mb-1.5">
-                    Assigned Instructor / Handler
-                  </label>
-                  <select
-                    value={modalAssignedTo}
-                    onChange={(e) => setModalAssignedTo(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15"
-                  >
-                    <option value="Kevin O'Connor">Kevin O'Connor (Senior Instructor)</option>
-                    <option value="Aisha Khan">Aisha Khan (Manual Specialist)</option>
-                    <option value="Michael Zhang">Michael Zhang (Test Route Assessor)</option>
-                    <option value="Sarah Jenkins">Sarah Jenkins (Beginner Coach)</option>
-                    <option value="Office Reception">Office Reception</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Internal Notes Textarea */}
-              <div className="space-y-1.5 pt-2">
-                <label className="block font-bold text-slate-800 text-xs">
-                  Internal Admin Follow-up Notes:
-                </label>
-                <textarea
-                  rows={3}
-                  value={modalNotes}
-                  onChange={(e) => setModalNotes(e.target.value)}
-                  placeholder="Record phone notes, packages discussed, pricing quoted, or follow-up tasks..."
-                  className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white text-xs text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15"
-                />
-              </div>
-
-              {/* Bottom Actions */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-slate-100">
                 <Link
                   href={`/bookings/create?student_name=${encodeURIComponent(
                     selectedInquiry.name
-                  )}&email=${encodeURIComponent(selectedInquiry.email)}&phone=${encodeURIComponent(
+                  )}&student_email=${encodeURIComponent(
+                    selectedInquiry.email
+                  )}&student_phone=${encodeURIComponent(
                     selectedInquiry.phone
-                  )}&suburb=${encodeURIComponent(selectedInquiry.suburb)}`}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors"
+                  )}&pickup_address=${encodeURIComponent(selectedInquiry.suburb || "Parramatta")}`}
+                  className="w-full py-2.5 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-[#07345B] font-heading font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
                 >
-                  <span>✓ Convert into Official Booking</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <CalendarCheck2 className="w-4 h-4 text-[#07345B]" />
+                  <span>+ Convert into Official Booking</span>
                 </Link>
-
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedInquiry(null)}
-                    className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs"
-                  >
-                    Close
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleSaveModalDetails}
-                    disabled={savingNotes}
-                    className="px-5 py-2.5 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-[#FAB10B] font-bold text-xs shadow-xs transition-colors disabled:opacity-75"
-                  >
-                    {savingNotes ? "Saving..." : "Save Details & Notes"}
-                  </button>
-                </div>
               </div>
             </div>
-          </Modal>
-        )}
+          )}
+        </Drawer>
 
-        {/* ADD MANUAL INQUIRY MODAL */}
-        {isAddModalOpen && (
-          <Modal
-            isOpen={isAddModalOpen}
-            onClose={() => setIsAddModalOpen(false)}
-            title="Log New Customer Inquiry"
-            maxWidth="2xl"
-          >
-            <form onSubmit={handleCreateNewInquiry} className="space-y-4 p-1 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-800 font-bold mb-1.5">
-                    Student Full Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Lucas Miller"
-                    value={newForm.name}
-                    onChange={(e) => setNewForm({ ...newForm, name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15"
-                  />
-                </div>
+        {/* ================= MODAL: ADD NEW INQUIRY ================= */}
+        <Modal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          title="Log New Customer Inquiry"
+        >
+          <form onSubmit={handleCreateNewInquiry} className="space-y-4 text-xs">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Customer Name *
+              </label>
+              <input
+                type="text"
+                required
+                value={newForm.name}
+                onChange={(e) => setNewForm({ ...newForm, name: e.target.value })}
+                placeholder="e.g. Priya Sharma"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-900"
+              />
+            </div>
 
-                <div>
-                  <label className="block text-slate-800 font-bold mb-1.5">
-                    Email Address <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g. lucas.miller@gmail.com"
-                    value={newForm.email}
-                    onChange={(e) => setNewForm({ ...newForm, email: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-800 font-bold mb-1.5">
-                    Australian Phone Number <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. 0412 345 678"
-                    value={newForm.phone}
-                    onChange={(e) => setNewForm({ ...newForm, phone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-800 font-bold mb-1.5">
-                    Suburb / Location
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Parramatta, Blacktown, Castle Hill"
-                    value={newForm.suburb}
-                    onChange={(e) => setNewForm({ ...newForm, suburb: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-800 font-bold mb-1.5">
-                    Lesson / Service Requested
-                  </label>
-                  <select
-                    value={newForm.lesson_type}
-                    onChange={(e) => setNewForm({ ...newForm, lesson_type: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15"
-                  >
-                    <option value="Automatic Driving Lessons">Automatic Driving Lessons</option>
-                    <option value="Manual Driving Lessons">Manual Driving Lessons</option>
-                    <option value="RMS Practical Test Package">RMS Practical Test Package</option>
-                    <option value="Complete Beginner Package (10 Lessons)">
-                      Complete Beginner Package (10 Lessons)
-                    </option>
-                    <option value="Overseas Licence Conversion">Overseas Licence Conversion</option>
-                    <option value="Defensive Driving & Motorway Confidence">
-                      Defensive Driving & Motorway Confidence
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-800 font-bold mb-1.5">
-                    Preferred Time Slot
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Weekend Morning, Weekday 4 PM"
-                    value={newForm.preferred_time}
-                    onChange={(e) => setNewForm({ ...newForm, preferred_time: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15"
-                  />
-                </div>
-              </div>
-
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-slate-800 font-bold mb-1.5">
-                  Inquiry Message / Customer Notes
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Email Address *
                 </label>
-                <textarea
-                  rows={3}
-                  placeholder="Details of the customer's request or inquiry notes..."
-                  value={newForm.message}
-                  onChange={(e) => setNewForm({ ...newForm, message: e.target.value })}
-                  className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white text-slate-900 font-medium focus:outline-none focus:ring-2 focus:ring-[#0B1528]/15"
+                <input
+                  type="email"
+                  required
+                  value={newForm.email}
+                  onChange={(e) => setNewForm({ ...newForm, email: e.target.value })}
+                  placeholder="priya@gmail.com"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-900"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingNew}
-                  className="px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-bold transition-colors disabled:opacity-75"
-                >
-                  {submittingNew ? "Saving Lead..." : "Save Customer Inquiry"}
-                </button>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Phone Number *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newForm.phone}
+                  onChange={(e) => setNewForm({ ...newForm, phone: e.target.value })}
+                  placeholder="+91 98765 43210"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-900"
+                />
               </div>
-            </form>
-          </Modal>
-        )}
+            </div>
 
-        {/* DELETE CONFIRMATION MODAL */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Subject *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newForm.subject}
+                  onChange={(e) => setNewForm({ ...newForm, subject: e.target.value })}
+                  placeholder="e.g. Driving Lesson Query"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Suburb / Location
+                </label>
+                <input
+                  type="text"
+                  value={newForm.suburb}
+                  onChange={(e) => setNewForm({ ...newForm, suburb: e.target.value })}
+                  placeholder="e.g. Parramatta"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-900"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Inquiry Message / Concern
+              </label>
+              <textarea
+                rows={3}
+                value={newForm.message}
+                onChange={(e) => setNewForm({ ...newForm, message: e.target.value })}
+                placeholder="Can you please share details about your beginner packages?"
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 leading-relaxed"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submittingNew}
+                className="px-5 py-2 rounded-xl bg-[#0B1528] hover:bg-[#07345B] text-white font-bold text-xs shadow-xs cursor-pointer"
+              >
+                {submittingNew ? "Saving..." : "Save Inquiry"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* ================= MODAL: CONFIRM DELETE ================= */}
         <ConfirmModal
           isOpen={!!deleteTarget}
-          title="Delete Inquiry"
-          message={`Are you sure you want to delete the inquiry from "${deleteTarget?.name}"? This action cannot be undone.`}
-          confirmLabel="Yes, Delete Inquiry"
-          variant="danger"
-          onConfirm={handleDeleteInquiry}
           onClose={() => setDeleteTarget(null)}
+          onConfirm={handleDeleteInquiry}
+          title="Delete Customer Inquiry"
+          message={`Are you sure you want to permanently delete the inquiry from ${deleteTarget?.name}? This action cannot be undone.`}
+          confirmLabel="Delete Inquiry"
+          variant="danger"
         />
-
-        {/* TOAST NOTIFICATION */}
-        {toast && (
-          <div
-            className={`fixed bottom-6 right-6 z-50 font-heading font-bold text-sm px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3 duration-200 ${
-              toast.type === "error"
-                ? "bg-rose-600 text-white"
-                : "bg-[#0B1528] text-white border border-[#FAB10B]/30"
-            }`}
-          >
-            <CheckCircle2 className="w-5 h-5 text-[#FAB10B]" />
-            <span>{toast.msg}</span>
-          </div>
-        )}
       </div>
     </AdminLayout>
   );

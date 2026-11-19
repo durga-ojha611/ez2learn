@@ -7,6 +7,13 @@ require_once dirname(__DIR__) . '/middleware/AuthMiddleware.php';
 
 class ContentController {
     // 1. Pages (Homepage, About, etc.)
+    public function getPages(): void {
+        AuthMiddleware::authenticate();
+        $db = Database::getConnection();
+        $pages = $db->query("SELECT id, page_key, title, meta_description, updated_at FROM website_pages ORDER BY id ASC")->fetchAll();
+        Response::success($pages, 'Pages list retrieved');
+    }
+
     public function getPage(string $key): void {
         AuthMiddleware::authenticate();
         $db = Database::getConnection();
@@ -28,23 +35,38 @@ class ContentController {
         $input = json_decode(file_get_contents('php://input'), true) ?? [];
         $db = Database::getConnection();
 
-        $sectionsJson = json_encode($input['sections'] ?? []);
+        // Fetch existing sections first to merge safely
+        $stmt = $db->prepare("SELECT sections_json FROM website_pages WHERE page_key = ?");
+        $stmt->execute([$key]);
+        $row = $stmt->fetch();
+        $existingSections = $row && !empty($row['sections_json']) ? json_decode($row['sections_json'], true) : [];
+        if (!is_array($existingSections)) {
+            $existingSections = [];
+        }
 
-        $stmt = $db->prepare("
+        if (isset($input['sections']) && is_array($input['sections'])) {
+            $mergedSections = array_merge($existingSections, $input['sections']);
+        } else {
+            $mergedSections = $existingSections;
+        }
+
+        $sectionsJson = json_encode($mergedSections, JSON_UNESCAPED_SLASHES);
+
+        $updateStmt = $db->prepare("
             UPDATE website_pages SET
                 title = COALESCE(?, title),
                 meta_description = COALESCE(?, meta_description),
                 sections_json = ?
             WHERE page_key = ?
         ");
-        $stmt->execute([
+        $updateStmt->execute([
             $input['title'] ?? null,
             $input['meta_description'] ?? null,
             $sectionsJson,
             $key
         ]);
 
-        Response::success(null, 'Page updated successfully');
+        Response::success($mergedSections, 'Page updated successfully');
     }
 
     // 2. FAQs

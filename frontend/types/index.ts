@@ -289,3 +289,50 @@ export interface NotificationItem {
   is_read: boolean | number;
   created_at: string;
 }
+
+
+export interface CmsPageSummary {
+  id: number;
+  page_key: string;
+  title: string;
+  meta_description?: string;
+  updated_at: string;
+}
+
+export interface FaqItem {
+  id: number;
+  category: string;
+  question: string;
+  answer: string;
+  sort_order: number;
+  is_published: number | boolean;
+}
+
+export interface GalleryItem {
+  id: number;
+  title: string;
+  image_url: string;
+  caption?: string;
+  category: string;
+  is_published: number | boolean;
+  sort_order: number;
+}
+
+
+export interface InquiryItem {
+  id: number;
+  name: string;
+  subject?: string;
+  email: string;
+  phone: string;
+  suburb: string;
+  lesson_type: string;
+  message: string;
+  status: "new" | "replied" | "contacted" | "converted" | "closed";
+  preferred_date?: string;
+  preferred_time?: string;
+  notes?: string;
+  assigned_to?: string;
+  created_at: string;
+  updated_at: string;
+}

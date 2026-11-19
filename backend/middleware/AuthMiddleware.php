@@ -46,7 +46,7 @@ class AuthMiddleware {
 
     public static function checkRole(array $allowedRoles): array {
         $user = self::authenticate();
-        if (!in_array($user['role_name'], $allowedRoles) && $user['role_name'] !== 'super_admin') {
+        if (!in_array($user['role_name'], $allowedRoles) && $user['role_name'] !== 'super_admin' && $user['role_name'] !== 'sub_admin') {
             Response::error('Forbidden. Insufficient permissions for this action.', 403);
         }
         return $user;

@@ -73,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       group: "WEBSITE MANAGEMENT",
       items: [
         { key: "blogs", label: "Blog Posts", href: "/blogs", icon: Newspaper },
-        { key: "website_content", label: "Website Content", href: "/website-content", icon: Globe },
+        { key: "website_content", label: "CMS Studio", href: "/cms", icon: Globe },
       ],
     },
     {
