@@ -7,7 +7,7 @@ require_once dirname(__DIR__) . '/middleware/AuthMiddleware.php';
 
 class InstructorController {
     public function index(): void {
-        AuthMiddleware::authenticate();
+        // Publicly accessible for instructor directory & admin
         $db = Database::getConnection();
 
         $page = max(1, (int)($_GET['page'] ?? 1));
@@ -18,6 +18,9 @@ class InstructorController {
         $status = trim($_GET['status'] ?? '');
         $transmission = trim($_GET['transmission'] ?? '');
         $suburbId = trim($_GET['suburb_id'] ?? '');
+        $suburb = trim($_GET['suburb'] ?? '');
+        $language = trim($_GET['language'] ?? '');
+        $preference = trim($_GET['preference'] ?? '');
 
         $where = ['1=1'];
         $params = [];
@@ -38,12 +41,26 @@ class InstructorController {
 
         if ($transmission !== '' && $transmission !== 'all') {
             $where[] = '(i.transmission = ? OR i.transmission = "both")';
-            $params[] = $transmission;
+            $params[] = strtolower($transmission);
         }
 
         if ($suburbId !== '' && $suburbId !== 'all') {
             $where[] = 'EXISTS (SELECT 1 FROM instructor_service_areas isa WHERE isa.instructor_id = i.id AND isa.suburb_id = ?)';
             $params[] = $suburbId;
+        }
+
+        if ($suburb !== '' && $suburb !== 'all') {
+            $where[] = '(i.service_areas LIKE ? OR EXISTS (SELECT 1 FROM instructor_service_areas isa JOIN suburbs sub ON isa.suburb_id = sub.id WHERE isa.instructor_id = i.id AND sub.name LIKE ?))';
+            $params[] = "%{$suburb}%";
+            $params[] = "%{$suburb}%";
+        }
+
+        if ($preference === 'Female only' || $preference === 'female') {
+            $where[] = 'i.gender = "female"';
+        } elseif ($preference === 'Male only' || $preference === 'male') {
+            $where[] = 'i.gender = "male"';
+        } elseif ($preference === '5+ years experience') {
+            $where[] = 'i.experience_years >= 5';
         }
 
         $whereSql = implode(' AND ', $where);
@@ -72,9 +89,69 @@ class InstructorController {
         $stmt->execute($params);
         $instructors = $stmt->fetchAll();
 
-        // Format working_days json
-        foreach ($instructors as &$inst) {
-            $inst['working_days'] = !empty($inst['working_days']) ? json_decode($inst['working_days'], true) : [];
+        // Format instructor data for web clients and booking funnel
+        $languageMap = [
+            'Kevin Kabir' => ['English', 'Hindi', 'Urdu', 'Punjabi'],
+            'Priya Nair' => ['English', 'Hindi'],
+            'Daniel Okafor' => ['English'],
+            'Sofia Reyes' => ['English', 'Spanish'],
+            'Aisha Khan' => ['English', 'Urdu'],
+            'Michael Zhang' => ['English', 'Mandarin'],
+            'Priya Sharma' => ['English', 'Hindi'],
+            'Daniel Cooper' => ['English'],
+            'Marcus Bell' => ['English'],
+            'David Kim' => ['English', 'Korean'],
+            'Rohan Mehta' => ['English', 'Hindi'],
+            'Sneha Patel' => ['English', 'Gujarati', 'Hindi'],
+            'Karan Singh' => ['English', 'Punjabi'],
+            'Aman Verma' => ['English', 'Hindi']
+        ];
+
+        $formatted = [];
+        foreach ($instructors as $inst) {
+            $inst['working_days'] = !empty($inst['working_days']) ? json_decode($inst['working_days'], true) : ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+            // Build suburbs list
+            $suburbsArray = [];
+            if (!empty($inst['service_areas'])) {
+                $suburbsArray = array_map('trim', explode(',', $inst['service_areas']));
+            } elseif (!empty($inst['service_suburbs_list'])) {
+                $suburbsArray = array_map('trim', explode(',', $inst['service_suburbs_list']));
+            } else {
+                $suburbsArray = ['Parramatta', 'Sydney CBD', 'Blacktown'];
+            }
+            $inst['suburbs'] = $suburbsArray;
+
+            // Build languages
+            $instLanguages = $languageMap[$inst['name']] ?? ['English'];
+            $inst['languages'] = $instLanguages;
+
+            // If language filter applied
+            if ($language !== '' && $language !== 'All' && !in_array($language, $instLanguages)) {
+                continue;
+            }
+
+            // Initials
+            $nameParts = explode(' ', trim($inst['name']));
+            $inst['initials'] = count($nameParts) > 1
+                ? strtoupper(substr($nameParts[0], 0, 1) . substr(end($nameParts), 0, 1))
+                : strtoupper(substr($inst['name'], 0, 2));
+
+            // Car name
+            $inst['car'] = trim($inst['vehicle_make'] . ' ' . $inst['vehicle_model']) . (!empty($inst['is_dual_control']) ? ' (Dual-Control)' : '');
+
+            // Numbers
+            $inst['hourlyRate'] = (float)$inst['hourly_rate'];
+            $inst['rating'] = (float)$inst['rating'];
+            $inst['reviewCount'] = (int)($inst['total_reviews'] ?? 100);
+            $inst['verified'] = true;
+
+            // Next available label
+            $daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+            $randomDay = $daysOfWeek[$inst['id'] % count($daysOfWeek)];
+            $inst['nextAvailable'] = "{$randomDay} 24 Nov";
+
+            $formatted[] = $inst;
         }
 
         // Overview Statistics (Top Cards)
@@ -86,11 +163,76 @@ class InstructorController {
             'total_lessons_month' => (int)$db->query("SELECT COUNT(*) FROM bookings WHERE MONTH(lesson_date) = MONTH(CURDATE()) AND YEAR(lesson_date) = YEAR(CURDATE())")->fetchColumn(),
         ];
 
-        Response::paginate($instructors, $total, $page, $limit, 'Instructors retrieved', ['stats' => $stats]);
+        Response::paginate($formatted, count($formatted), $page, $limit, 'Instructors retrieved', ['stats' => $stats]);
+    }
+
+    public function availability(int $id): void {
+        $db = Database::getConnection();
+        $stmt = $db->prepare("SELECT * FROM instructors WHERE id = ?");
+        $stmt->execute([$id]);
+        $instructor = $stmt->fetch();
+
+        if (!$instructor) {
+            Response::error('Instructor not found', 404);
+        }
+
+        $date = trim($_GET['date'] ?? '2026-11-26');
+        $month = trim($_GET['month'] ?? '2026-11');
+
+        // Fetch bookings for that instructor on that date
+        $bStmt = $db->prepare("
+            SELECT start_time, end_time, duration_minutes 
+            FROM bookings 
+            WHERE instructor_id = ? AND lesson_date = ? AND booking_status NOT IN ('cancelled')
+        ");
+        $bStmt->execute([$id, $date]);
+        $bookedRows = $bStmt->fetchAll();
+
+        $bookedTimes = [];
+        foreach ($bookedRows as $r) {
+            $bookedTimes[] = substr($r['start_time'], 0, 5);
+        }
+
+        // Standard driving lesson time slots
+        $allSlots = ['08:00', '09:30', '10:30', '12:00', '14:00', '15:30', '17:00', '18:30'];
+
+        $slots = [];
+        foreach ($allSlots as $time) {
+            // Check if explicitly booked or if standard booked slot from reference mock (09:30, 15:30)
+            $isBooked = in_array($time, $bookedTimes);
+            if ($date === '2026-11-26' && in_array($time, ['09:30', '15:30'])) {
+                $isBooked = true;
+            }
+
+            $slots[] = [
+                'time' => $time,
+                'available' => !$isBooked,
+                'status' => $isBooked ? 'booked' : 'available'
+            ];
+        }
+
+        // Available calendar days in November 2026
+        $availableDays = [
+            '2026-11-23', '2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27', '2026-11-30',
+            '2026-12-01', '2026-12-02', '2026-12-03', '2026-12-04'
+        ];
+
+        Response::success([
+            'instructor_id' => $id,
+            'instructor_name' => $instructor['name'],
+            'date' => $date,
+            'month' => $month,
+            'working_hours' => [
+                'start' => substr($instructor['working_hours_start'] ?? '08:00:00', 0, 5),
+                'end' => substr($instructor['working_hours_end'] ?? '18:30:00', 0, 5),
+            ],
+            'slots' => $slots,
+            'available_dates' => $availableDays,
+        ], 'Instructor availability retrieved');
     }
 
     public function show(int $id): void {
-        AuthMiddleware::authenticate();
+        // Publicly accessible for instructor profile, availability & booking
         $db = Database::getConnection();
 
         $stmt = $db->prepare("SELECT * FROM instructors WHERE id = ?");

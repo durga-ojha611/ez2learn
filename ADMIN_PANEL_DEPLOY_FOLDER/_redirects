@@ -1,0 +1,17 @@
+/admin /dashboard 301
+/api/dashboard/overview /api/dashboard/overview/index.json 200
+/api/bookings /api/bookings/index.json 200
+/api/instructors /api/instructors/index.json 200
+/api/inquiries /api/inquiries/index.json 200
+/api/services /api/services/index.json 200
+/api/reviews /api/reviews/index.json 200
+/api/calendar/events /api/calendar/events/index.json 200
+/api/content/page/homepage /api/content/page/homepage/index.json 200
+/api/notifications /api/notifications/index.json 200
+/api/reports/analytics /api/reports/analytics/index.json 200
+/api/settings /api/settings/index.json 200
+/api/students /api/students/index.json 200
+/api/locations /api/locations/index.json 200
+/api/subadmins /api/subadmins/index.json 200
+/api/blogs /api/blogs/index.json 200
+/* /index.html 200

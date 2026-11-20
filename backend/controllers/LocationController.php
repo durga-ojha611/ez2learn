@@ -43,6 +43,18 @@ class LocationController {
         ], 'Locations retrieved');
     }
 
+    public function getSuburbsList(): void {
+        $db = Database::getConnection();
+        $suburbs = $db->query("
+            SELECT s.id, s.name, s.postcode, s.region
+            FROM suburbs s
+            WHERE s.is_active = 1
+            ORDER BY s.region ASC, s.name ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        Response::success($suburbs, 'Suburbs list retrieved');
+    }
+
     public function getInstructorsBySuburb(int $suburbId): void {
         AuthMiddleware::authenticate();
         $db = Database::getConnection();

@@ -38,6 +38,20 @@ class ServiceController {
         ], 'Services and packages retrieved');
     }
 
+    public function getPackages(): void {
+        // Public endpoint for package listing & booking funnel
+        $db = Database::getConnection();
+        $packages = $db->query("
+            SELECT * FROM packages WHERE is_active = 1 ORDER BY price_aud ASC
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($packages as &$pkg) {
+            $pkg['features'] = !empty($pkg['features']) ? json_decode($pkg['features'], true) : [];
+        }
+
+        Response::success($packages, 'Packages retrieved');
+    }
+
     public function storeService(): void {
         AuthMiddleware::authenticate();
         $input = json_decode(file_get_contents('php://input'), true) ?? [];

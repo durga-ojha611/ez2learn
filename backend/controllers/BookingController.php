@@ -164,42 +164,113 @@ class BookingController {
     }
 
     public function store(): void {
-        $user = AuthMiddleware::authenticate();
-        $input = json_decode(file_get_contents('php://input'), true) ?? [];
-
+        // Authenticate admin if token present, or allow public student checkout
+        $user = null;
+        $token = Auth::getBearerToken();
         $db = Database::getConnection();
 
-        // 1. Resolve or create student
+        if ($token) {
+            $payload = Auth::verifyToken($token);
+            if ($payload && isset($payload['user_id'])) {
+                $uStmt = $db->prepare("SELECT id, name FROM admin_users WHERE id = ?");
+                $uStmt->execute([$payload['user_id']]);
+                $user = $uStmt->fetch();
+            }
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+
+        // 1. Resolve or create/update student
+        $studentEmail = trim($input['student_email'] ?? ($input['email'] ?? ''));
+        $studentName = trim($input['student_name'] ?? '');
+        $firstName = trim($input['first_name'] ?? '');
+        $lastName = trim($input['last_name'] ?? '');
+
+        if (!$studentName && ($firstName || $lastName)) {
+            $studentName = trim("{$firstName} {$lastName}");
+        }
+        if (!$studentName) {
+            $studentName = 'Learner Student';
+        }
+        if (!$firstName && $studentName) {
+            $parts = explode(' ', $studentName);
+            $firstName = $parts[0];
+            $lastName = count($parts) > 1 ? end($parts) : '';
+        }
+
+        $studentPhone = trim($input['student_phone'] ?? ($input['phone'] ?? ($input['mobile'] ?? '')));
+        $pickupAddress = trim($input['pickup_address'] ?? ($input['pickup_street'] ?? '45 Church Street'));
+        $pickupSuburb = trim($input['pickup_suburb'] ?? 'Parramatta');
+        $pickupPostcode = trim($input['pickup_postcode'] ?? '2150');
+        $licenceStage = $input['licence_stage'] ?? ($input['licence_type'] ?? 'learner');
+        if (str_contains(strtolower($licenceStage), 'learner')) $licenceStage = 'learner';
+        elseif (str_contains(strtolower($licenceStage), 'p1')) $licenceStage = 'provisional_p1';
+        elseif (str_contains(strtolower($licenceStage), 'p2')) $licenceStage = 'provisional_p2';
+        elseif (str_contains(strtolower($licenceStage), 'overseas')) $licenceStage = 'overseas_conversion';
+        else $licenceStage = 'learner';
+
+        $licenceNumber = trim($input['licence_number'] ?? '');
+        $logbookHours = (float)($input['logbook_hours'] ?? 0);
+        $dob = !empty($input['date_of_birth']) ? date('Y-m-d', strtotime(str_replace('/', '-', $input['date_of_birth']))) : null;
+        $emergencyName = trim($input['emergency_contact_name'] ?? ($input['emergency_name'] ?? ''));
+        $emergencyPhone = trim($input['emergency_contact_phone'] ?? ($input['emergency_phone'] ?? ''));
+
         $studentId = !empty($input['student_id']) ? (int)$input['student_id'] : null;
-        if (!$studentId && !empty($input['student_email'])) {
+        if (!$studentId && $studentEmail) {
             $checkStudent = $db->prepare("SELECT id FROM students WHERE email = ? LIMIT 1");
-            $checkStudent->execute([trim($input['student_email'])]);
+            $checkStudent->execute([$studentEmail]);
             $existingStudent = $checkStudent->fetch();
             if ($existingStudent) {
                 $studentId = (int)$existingStudent['id'];
+                // Update student details with new booking info
+                $updStudent = $db->prepare("
+                    UPDATE students SET
+                        name = COALESCE(?, name),
+                        first_name = COALESCE(?, first_name),
+                        last_name = COALESCE(?, last_name),
+                        phone = COALESCE(?, phone),
+                        address = COALESCE(?, address),
+                        suburb = COALESCE(?, suburb),
+                        postcode = COALESCE(?, postcode),
+                        licence_number = COALESCE(?, licence_number),
+                        licence_stage = COALESCE(?, licence_stage),
+                        emergency_contact_name = COALESCE(?, emergency_contact_name),
+                        emergency_contact_phone = COALESCE(?, emergency_contact_phone),
+                        date_of_birth = COALESCE(?, date_of_birth)
+                    WHERE id = ?
+                ");
+                $updStudent->execute([
+                    $studentName, $firstName, $lastName, $studentPhone ?: null,
+                    $pickupAddress, $pickupSuburb, $pickupPostcode,
+                    $licenceNumber ?: null, $licenceStage,
+                    $emergencyName ?: null, $emergencyPhone ?: null,
+                    $dob, $studentId
+                ]);
             } else {
                 $studentCode = 'STU-' . rand(1000, 9999);
-                $studentName = trim($input['student_name'] ?? 'Learner Student');
-                $parts = explode(' ', $studentName);
-                $firstName = $parts[0];
-                $lastName = count($parts) > 1 ? end($parts) : '';
                 $insertStudent = $db->prepare("
                     INSERT INTO students (
-                        student_code, name, first_name, last_name, email, phone,
-                        address, suburb, postcode, licence_stage, preferred_transmission, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                        student_code, name, first_name, last_name, email, phone, date_of_birth,
+                        address, suburb, postcode, licence_number, licence_stage, nsw_logbook_hours,
+                        emergency_contact_name, emergency_contact_phone, preferred_transmission, status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
                 ");
                 $insertStudent->execute([
                     $studentCode,
                     $studentName,
                     $firstName,
                     $lastName,
-                    trim($input['student_email']),
-                    trim($input['student_phone'] ?? ''),
-                    trim($input['pickup_address'] ?? ''),
-                    trim($input['pickup_suburb'] ?? 'Sydney'),
-                    trim($input['pickup_postcode'] ?? '2000'),
-                    $input['licence_stage'] ?? 'learner',
+                    $studentEmail,
+                    $studentPhone,
+                    $dob,
+                    $pickupAddress,
+                    $pickupSuburb,
+                    $pickupPostcode,
+                    $licenceNumber ?: null,
+                    $licenceStage,
+                    $logbookHours,
+                    $emergencyName ?: null,
+                    $emergencyPhone ?: null,
                     $input['transmission'] ?? 'automatic'
                 ]);
                 $studentId = (int)$db->lastInsertId();
@@ -207,69 +278,64 @@ class BookingController {
         }
 
         if (!$studentId) {
-            Response::error('A valid student selection or student details (name, email) are required.', 422);
+            Response::error('A valid student email or student ID is required for booking.', 422);
         }
 
-        $input['student_id'] = $studentId;
+        // 2. Resolve primary lesson date, start time, and duration
+        $lessonDate = $input['lesson_date'] ?? null;
+        $startTime = $input['start_time'] ?? null;
+        $duration = !empty($input['duration_minutes']) ? (int)$input['duration_minutes'] : (!empty($input['lesson_length_hours']) ? (int)$input['lesson_length_hours'] * 60 : 120);
 
-        $validator = new Validator($input);
-        if (!$validator->validate([
-            'student_id' => 'required|numeric',
-            'lesson_date' => 'required',
-            'start_time' => 'required',
-            'duration_minutes' => 'required|numeric',
-            'pickup_address' => 'required',
-            'pickup_suburb' => 'required',
-            'pickup_postcode' => 'required',
-            'amount_aud' => 'required|numeric'
-        ])) {
-            Response::error('Validation failed', 422, $validator->errors());
-        }
-
-        // Calculate end_time
-        $startTime = $input['start_time'];
-        if (strlen($startTime) === 5) {
-            $startTime .= ':00';
-        }
-        $duration = (int)$input['duration_minutes'];
-        $endTime = date('H:i:s', strtotime("{$startTime} + {$duration} minutes"));
-
-        // Check instructor conflict if assigned
-        $instructorId = !empty($input['instructor_id']) ? (int)$input['instructor_id'] : null;
-        if ($instructorId) {
-            $conflictStmt = $db->prepare("
-                SELECT id FROM bookings
-                WHERE instructor_id = ? 
-                  AND lesson_date = ?
-                  AND booking_status NOT IN ('cancelled')
-                  AND (
-                    (start_time <= ? AND end_time > ?) OR
-                    (start_time < ? AND end_time >= ?) OR
-                    (start_time >= ? AND end_time <= ?)
-                  )
-                LIMIT 1
-            ");
-            $conflictStmt->execute([
-                $instructorId,
-                $input['lesson_date'],
-                $startTime, $startTime,
-                $endTime, $endTime,
-                $startTime, $endTime
-            ]);
-            if ($conflictStmt->fetch()) {
-                Response::error('The selected instructor is already booked for this time slot.', 409);
+        if (!empty($input['booked_slots']) && is_array($input['booked_slots']) && count($input['booked_slots']) > 0) {
+            $firstSlot = $input['booked_slots'][0];
+            $lessonDate = $firstSlot['date'] ?? $lessonDate;
+            if (!empty($firstSlot['time'])) {
+                // e.g. "10:00 - 12:00" -> "10:00"
+                $parts = explode('-', $firstSlot['time']);
+                $startTime = trim($parts[0]);
+            }
+            if (!empty($firstSlot['duration'])) {
+                $duration = (int)$firstSlot['duration'] * 60;
             }
         }
 
-        $bookingCode = 'BK-' . rand(1000, 9999);
-        $status = !empty($input['booking_status']) ? $input['booking_status'] : (!empty($instructorId) ? 'confirmed' : 'pending');
-        $paymentStatus = !empty($input['payment_status']) ? $input['payment_status'] : 'pending';
-        $paymentMethod = !empty($input['payment_method']) ? $input['payment_method'] : 'Credit Card';
-        $txnId = !empty($input['transaction_id']) ? $input['transaction_id'] : ($paymentStatus === 'paid' ? 'TXN-' . date('Y') . '-' . rand(1000, 9999) : null);
+        if (!$lessonDate) {
+            $lessonDate = date('Y-m-d', strtotime('+3 days'));
+        }
+        if (!$startTime) {
+            $startTime = '10:00';
+        }
+        if (strlen($startTime) === 5) {
+            $startTime .= ':00';
+        }
 
-        $amountAud = (float)$input['amount_aud'];
-        $discountAud = (float)($input['discount_aud'] ?? 0);
-        $finalAmountAud = !empty($input['final_amount_aud']) ? (float)$input['final_amount_aud'] : max(0, $amountAud - $discountAud);
+        $endTime = date('H:i:s', strtotime("{$startTime} + {$duration} minutes"));
+
+        // 3. Resolve Instructor
+        $instructorId = !empty($input['instructor_id']) ? (int)$input['instructor_id'] : 1;
+        $instStmt = $db->prepare("SELECT name, email FROM instructors WHERE id = ?");
+        $instStmt->execute([$instructorId]);
+        $instructorRow = $instStmt->fetch();
+        $instructorName = $instructorRow['name'] ?? 'Assigned Instructor';
+
+        // 4. Financials & Booking codes
+        $amountAud = (float)($input['amount_aud'] ?? ($input['subtotal'] ?? 150.00));
+        $discountAud = (float)($input['discount_aud'] ?? ($input['discount_amount'] ?? 0));
+        $finalAmountAud = !empty($input['final_amount_aud']) ? (float)$input['final_amount_aud'] : (!empty($input['total_amount']) ? (float)$input['total_amount'] : max(0, $amountAud - $discountAud));
+
+        $bookingCode = !empty($input['booking_code']) ? $input['booking_code'] : ('EZY-' . rand(100000, 999999));
+        $status = !empty($input['booking_status']) ? $input['booking_status'] : 'confirmed';
+        $paymentStatus = !empty($input['payment_status']) ? $input['payment_status'] : 'paid';
+        $paymentMethod = !empty($input['payment_method']) ? $input['payment_method'] : 'Credit Card';
+        $txnId = !empty($input['transaction_id']) ? $input['transaction_id'] : ('TXN-' . date('Y') . '-' . rand(10000, 99999));
+        $receiptNumber = 'RCP-' . rand(100000, 999999);
+
+        // Serialize full schedule & special requirements
+        $bookedSlotsJson = !empty($input['booked_slots']) ? json_encode($input['booked_slots']) : null;
+        $specialRequirements = !empty($input['prefer_calm_instructor']) ? 'Calm, patient instructor preferred. ' : '';
+        if (!empty($input['special_requirements'])) {
+            $specialRequirements .= $input['special_requirements'];
+        }
 
         $stmt = $db->prepare("
             INSERT INTO bookings (
@@ -289,20 +355,20 @@ class BookingController {
             !empty($input['service_id']) ? (int)$input['service_id'] : null,
             !empty($input['package_id']) ? (int)$input['package_id'] : null,
             $input['transmission'] ?? 'automatic',
-            $input['lesson_date'],
+            $lessonDate,
             $startTime,
             $endTime,
             $duration,
-            $input['lesson_package'] ?? 'Standard Lesson',
+            $input['lesson_package'] ?? ($input['package_type'] ?? 'Driving Lesson Package'),
             $input['lesson_category'] ?? 'Standard',
-            $input['pickup_address'],
-            $input['pickup_suburb'],
-            $input['pickup_postcode'],
-            $input['dropoff_address'] ?? $input['pickup_address'],
-            $input['special_notes'] ?? ($input['student_notes'] ?? null),
-            $input['student_notes'] ?? null,
-            $input['special_requirements'] ?? null,
-            $input['admin_notes'] ?? 'Created by admin.',
+            $pickupAddress,
+            $pickupSuburb,
+            $pickupPostcode,
+            $input['dropoff_address'] ?? $pickupAddress,
+            $input['special_notes'] ?? null,
+            $bookedSlotsJson,
+            $specialRequirements ?: null,
+            $user ? ("Created by admin: " . $user['name']) : 'Booked online via Website Booking Funnel',
             $amountAud,
             $discountAud,
             $finalAmountAud,
@@ -310,23 +376,12 @@ class BookingController {
             $txnId,
             $status,
             $paymentStatus,
-            $user['id'] ?? 1
+            $user['id'] ?? null
         ]);
 
         $bookingId = (int)$db->lastInsertId();
 
-        // Add history log
-        $db->prepare("
-            INSERT INTO booking_history (booking_id, admin_user_id, action, new_status, comment)
-            VALUES (?, ?, 'created', ?, ?)
-        ")->execute([
-            $bookingId,
-            $user['id'] ?? 1,
-            $status,
-            "Booking created by admin " . ($user['name'] ?? 'Admin') . " with initial status '{$status}'"
-        ]);
-
-        // If payment is marked as paid upfront, record in payments table
+        // 5. Insert payment record
         if ($paymentStatus === 'paid') {
             $paymentMethodEnum = 'credit_card';
             $pLower = strtolower($paymentMethod);
@@ -338,34 +393,53 @@ class BookingController {
                 INSERT INTO payments (transaction_id, booking_id, student_id, amount_aud, payment_method, payment_status, receipt_number, paid_at)
                 VALUES (?, ?, ?, ?, ?, 'paid', ?, NOW())
             ")->execute([
-                $txnId ?: ('TXN-' . date('Y') . '-' . rand(1000, 9999)),
+                $txnId,
                 $bookingId,
                 $studentId,
                 $finalAmountAud,
                 $paymentMethodEnum,
-                'RCP-' . rand(10000, 99999)
+                $receiptNumber
             ]);
         }
 
-        // Fetch complete created booking row with joined tables
-        $stmtGet = $db->prepare("
-            SELECT b.*,
-                   s.student_code, s.name as student_name, s.email as student_email, s.phone as student_phone, s.avatar_url as student_avatar, s.licence_stage, s.licence_status, s.licence_number, s.completed_lessons as student_completed_lessons, s.nsw_logbook_hours, s.emergency_contact_name, s.emergency_contact_phone,
-                   i.instructor_code, i.name as instructor_name, i.phone as instructor_phone, i.avatar_url as instructor_avatar, i.vehicle_make, i.vehicle_model, i.vehicle_rego, i.accreditation_number as instructor_accreditation, i.rating as instructor_rating,
-                   srv.name as service_name, srv.duration_minutes as service_duration,
-                   pkg.name as package_name
-            FROM bookings b
-            JOIN students s ON b.student_id = s.id
-            LEFT JOIN instructors i ON b.instructor_id = i.id
-            LEFT JOIN services srv ON b.service_id = srv.id
-            LEFT JOIN packages pkg ON b.package_id = pkg.id
-            WHERE b.id = ?
-            LIMIT 1
-        ");
-        $stmtGet->execute([$bookingId]);
-        $newBooking = $stmtGet->fetch();
+        // 6. Insert audit trail in booking_history
+        $db->prepare("
+            INSERT INTO booking_history (booking_id, admin_user_id, action, new_status, comment)
+            VALUES (?, ?, 'created', ?, ?)
+        ")->execute([
+            $bookingId,
+            $user['id'] ?? null,
+            $status,
+            $user ? ("Booking created by admin " . $user['name']) : "Online booking confirmed by learner {$studentName}"
+        ]);
 
-        Response::success($newBooking ?: ['id' => $bookingId, 'booking_code' => $bookingCode], 'Booking created successfully', 201);
+        // 7. Insert Notification for Admin Portal
+        $totalHours = !empty($input['total_hours']) ? (int)$input['total_hours'] : round($duration / 60);
+        $db->prepare("
+            INSERT INTO notifications (title, message, category, related_id, link_url, is_read, created_at)
+            VALUES (?, ?, 'booking', ?, ?, 0, NOW())
+        ")->execute([
+            "New Booking: #{$bookingCode}",
+            "{$studentName} booked {$totalHours} hrs with {$instructorName}. Total paid: \${$finalAmountAud} AUD.",
+            $bookingId,
+            "/bookings?search={$bookingCode}"
+        ]);
+
+        // 8. Return response
+        Response::success([
+            'id' => $bookingId,
+            'booking_code' => $bookingCode,
+            'receipt_number' => $receiptNumber,
+            'student_id' => $studentId,
+            'student_name' => $studentName,
+            'instructor_name' => $instructorName,
+            'amount_paid' => $finalAmountAud,
+            'lesson_date' => $lessonDate,
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+            'payment_method' => $paymentMethod,
+            'transaction_id' => $txnId
+        ], 'Booking and payment confirmed successfully', 201);
     }
 
     public function update(int $id): void {

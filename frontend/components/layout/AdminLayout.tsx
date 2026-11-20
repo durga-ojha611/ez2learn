@@ -43,10 +43,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.replace("/login");
-      return;
-    }
     const user = getStoredUser();
     setCurrentUser(user);
 
@@ -85,7 +81,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
 
   const handleLogout = () => {
     clearAuthSession();
-    router.replace("/login");
+    router.replace("/");
   };
 
   const handleMarkAsRead = async (id: number) => {

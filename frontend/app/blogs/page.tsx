@@ -173,11 +173,11 @@ export default function BlogsPage() {
               <span className="text-slate-600">{formattedToday}</span>
 
               <button
-                onClick={() => router.push("/login")}
+                onClick={() => router.push("/")}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 font-bold transition-colors cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
-                <span>Logout</span>
+                <span>Exit</span>
               </button>
             </div>
           }

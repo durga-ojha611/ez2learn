@@ -102,6 +102,7 @@ $router->delete('/api/bookings/{id}', 'BookingController@delete');
 
 // --- Instructors ---
 $router->get('/api/instructors', 'InstructorController@index');
+$router->get('/api/instructors/{id}/availability', 'InstructorController@availability');
 $router->get('/api/instructors/{id}', 'InstructorController@show');
 $router->post('/api/instructors', 'InstructorController@store');
 $router->put('/api/instructors/{id}', 'InstructorController@update');
@@ -124,6 +125,7 @@ $router->get('/api/calendar/check-availability', 'CalendarController@checkSlotAv
 
 // --- Services & Packages ---
 $router->get('/api/services', 'ServiceController@index');
+$router->get('/api/packages', 'ServiceController@getPackages');
 $router->post('/api/services', 'ServiceController@storeService');
 $router->put('/api/services/{id}', 'ServiceController@updateService');
 $router->delete('/api/services/{id}', 'ServiceController@deleteService');
@@ -131,14 +133,16 @@ $router->post('/api/packages', 'ServiceController@storePackage');
 $router->put('/api/packages/{id}', 'ServiceController@updatePackage');
 $router->delete('/api/packages/{id}', 'ServiceController@deletePackage');
 
-// --- Payments ---
+// --- Payments & Promo ---
 $router->get('/api/payments', 'PaymentController@index');
+$router->post('/api/promo/validate', 'PaymentController@validatePromo');
 $router->post('/api/payments/{id}/refund', 'PaymentController@refund');
 $router->patch('/api/payments/{id}/status', 'PaymentController@updateStatus');
 $router->get('/api/payments/export', 'PaymentController@exportCsv');
 
 // --- Locations ---
 $router->get('/api/locations', 'LocationController@index');
+$router->get('/api/suburbs', 'LocationController@getSuburbsList');
 $router->get('/api/locations/{id}/instructors', 'LocationController@getInstructorsBySuburb');
 $router->post('/api/locations/suburbs', 'LocationController@storeSuburb');
 $router->put('/api/locations/suburbs/{id}', 'LocationController@updateSuburb');

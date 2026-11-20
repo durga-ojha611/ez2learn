@@ -159,6 +159,62 @@ class PaymentController {
         Response::success(null, "Payment status updated to " . ucfirst($status));
     }
 
+    public function validatePromo(): void {
+        $input = json_decode(file_get_contents('php://input'), true) ?? [];
+        $code = strtoupper(trim($input['code'] ?? ''));
+        $subtotal = (float)($input['subtotal'] ?? 0);
+
+        if (empty($code)) {
+            Response::error('Promo code is required', 422);
+        }
+
+        $validPromos = [
+            'EZY10' => [
+                'code' => 'EZY10',
+                'type' => 'fixed',
+                'value' => 10,
+                'description' => '$10 AUD discount'
+            ],
+            'BONUS5' => [
+                'code' => 'BONUS5',
+                'type' => 'percent',
+                'value' => 5,
+                'description' => '5% off lesson booking'
+            ],
+            'WELCOME20' => [
+                'code' => 'WELCOME20',
+                'type' => 'fixed',
+                'value' => 20,
+                'description' => '$20 AUD First-time learner discount'
+            ],
+            'DRIVESAFE' => [
+                'code' => 'DRIVESAFE',
+                'type' => 'percent',
+                'value' => 10,
+                'description' => '10% off driving package'
+            ]
+        ];
+
+        if (!isset($validPromos[$code])) {
+            Response::error("Invalid discount code '{$code}'. Try 'EZY10' or 'BONUS5'", 404);
+        }
+
+        $promo = $validPromos[$code];
+        $discountAmount = $promo['type'] === 'fixed'
+            ? (float)$promo['value']
+            : round(($subtotal * $promo['value']) / 100, 2);
+
+        Response::success([
+            'valid' => true,
+            'code' => $promo['code'],
+            'type' => $promo['type'],
+            'value' => $promo['value'],
+            'discount_amount' => $discountAmount,
+            'description' => $promo['description'],
+            'message' => "Promo code '{$code}' applied successfully!"
+        ], 'Promo code applied');
+    }
+
     public function exportCsv(): void {
         AuthMiddleware::authenticate();
         $db = Database::getConnection();

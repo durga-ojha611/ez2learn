@@ -1,0 +1,25 @@
+# API Endpoints
+/api/instructors /api/instructors/index.json 200
+/api/packages /api/packages/index.json 200
+/api/instructors/1/availability /api/instructors/1/availability/index.json 200
+/api/instructors/2/availability /api/instructors/2/availability/index.json 200
+/api/instructors/3/availability /api/instructors/3/availability/index.json 200
+/api/instructors/4/availability /api/instructors/4/availability/index.json 200
+/api/promo/validate /api/promo/validate/index.json 200
+/api/bookings /api/bookings/index.json 200
+
+# Instructors root and booking funnel routing
+/ /index.html 200
+/our-instructors /our-instructors/index.html 200
+/our-instructors/1 /our-instructors/1/index.html 200
+/our-instructors/2 /our-instructors/2/index.html 200
+/our-instructors/3 /our-instructors/3/index.html 200
+/our-instructors/4 /our-instructors/4/index.html 200
+/our-instructors/1/book /our-instructors/1/book/index.html 200
+/our-instructors/2/book /our-instructors/2/book/index.html 200
+/our-instructors/3/book /our-instructors/3/book/index.html 200
+/our-instructors/4/book /our-instructors/4/book/index.html 200
+/book /book/index.html 200
+
+# Client-side SPA fallback (prevents any Netlify 404)
+/* /index.html 200

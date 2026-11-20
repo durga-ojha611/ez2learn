@@ -354,13 +354,23 @@ export default function InstructorsPage() {
           subtitle="Manage licensed RMS driving instructors, working hours, and suburbs"
           badge={`${kpiStats.total || instructors.length} Instructors`}
           actions={
-            <button
-              onClick={() => router.push("/instructors/create")}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0B1528] hover:bg-[#162744] text-white text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-[#FAB10B] stroke-[2.5]" />
-              <span>Add Instructor</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/our-instructors"
+                target="_blank"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl border border-slate-200 shadow-2xs transition-all cursor-pointer"
+              >
+                <ExternalLink className="w-3.5 h-3.5 text-[#07345B]" />
+                <span>View Public Page ↗</span>
+              </Link>
+              <button
+                onClick={() => router.push("/instructors/create")}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#0B1528] hover:bg-[#162744] text-white text-xs sm:text-sm font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-[#FAB10B] stroke-[2.5]" />
+                <span>Add Instructor</span>
+              </button>
+            </div>
           }
         />
 

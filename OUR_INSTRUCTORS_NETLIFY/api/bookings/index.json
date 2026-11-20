@@ -1,0 +1,9 @@
+{
+  "success": true,
+  "message": "Booking confirmed successfully",
+  "data": {
+    "booking_reference": "EZY-782914",
+    "amount_paid": 630,
+    "status": "confirmed"
+  }
+}

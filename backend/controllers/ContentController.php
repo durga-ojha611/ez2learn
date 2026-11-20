@@ -15,7 +15,7 @@ class ContentController {
     }
 
     public function getPage(string $key): void {
-        AuthMiddleware::authenticate();
+        // Publicly accessible for website landing page & CMS preview
         $db = Database::getConnection();
 
         $stmt = $db->prepare("SELECT * FROM website_pages WHERE page_key = ?");
